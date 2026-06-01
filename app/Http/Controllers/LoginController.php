@@ -15,15 +15,21 @@ class LoginController extends Controller
 
         if (Auth::attempt($credentials)) {            
             Auth::user();
-            
+            if (Auth::user()->role !== 'admin') {
             // tạo token
-            $token = Auth::user()->createToken('auth_token')->plainTextToken;
+                $token = Auth::user()->createToken('auth_token')->plainTextToken;
 
-            return response()->json([
-                'message' => 'Đăng nhập thành công.',
-                'user' => Auth::user(),
-                'token' => $token,
-            ]); 
+                return response()->json([
+                    'message' => 'Đăng nhập thành công.',
+                    'user' => Auth::user(),
+                    'token' => $token,
+                    'role' => Auth::user()->role,
+                ]); 
+            } else {
+                return response()->json([
+                    'message' => 'Bạn không có quyền truy cập.',
+                ], 403);
+            }
         }
 
         return response()->json([
@@ -57,4 +63,5 @@ class LoginController extends Controller
             'message' => 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin đăng nhập.',
         ], 401);
     }
+
 }
