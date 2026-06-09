@@ -10,13 +10,13 @@ class Wishlist extends Model
     protected $table = 'wishlists';
 
     protected $fillable = [
-        'candidate_id',
+        'user_id',
         'job_id',
     ];
 
-    public function candidate(): BelongsTo
+    public function user(): BelongsTo
     {
-        return $this->belongsTo(Candidate::class, 'candidate_id', 'id');
+        return $this->belongsTo(User::class, 'user_id', 'id');
     }
 
     public function job(): BelongsTo

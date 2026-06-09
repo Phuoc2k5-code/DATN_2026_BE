@@ -16,6 +16,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
             $table->foreignId('cv_template_id')->nullable()->constrained('cv_templates')->onDelete('set null');
             $table->foreignId('category_id')->nullable()->constrained('categories')->onDelete('set null');
+            $table->string('title');
             $table->string('full_name');
             $table->string('gender')->nullable();
             $table->date('birthday')->nullable();

@@ -20,6 +20,7 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->decimal('matching_score', 5, 2)->default(0.00); // Ví dụ: 85.50 %
             $table->string('status')->default('pending'); // pending, reviewed, accepted, rejected
+            $table->json('status_details')->nullable();
             $table->timestamp('applied_at')->useCurrent();
             $table->timestamps();
         });

@@ -63,4 +63,9 @@ class Job extends Model
     {
         return $this->hasMany(JobClick::class, 'job_id', 'id');
     }
+
+    public function wishlist(): HasMany
+    {
+        return $this->hasMany(Wishlist::class, 'job_id', 'id');
+    }
 }

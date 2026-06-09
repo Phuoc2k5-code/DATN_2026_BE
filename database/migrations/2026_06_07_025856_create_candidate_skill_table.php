@@ -15,6 +15,7 @@ return new class extends Migration
             $table->foreignId('candidate_id')->constrained('candidates')->onDelete('cascade');
             $table->foreignId('skill_id')->constrained('skills')->onDelete('cascade');
             $table->primary(['candidate_id', 'skill_id']);
+            $table->string('level')->default('Cơ bản');
         });
     }
 

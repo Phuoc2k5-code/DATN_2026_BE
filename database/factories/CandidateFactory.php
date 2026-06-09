@@ -1,4 +1,5 @@
 <?php
+
 namespace Database\Factories;
 
 use App\Models\User;
@@ -17,6 +18,14 @@ class CandidateFactory extends Factory
             'Trịnh Hoài Nam', 'Nguyễn Thảo Nguyên', 'Cao Minh Đạt', 'Mai Phương Thúy'
         ];
 
+        // 💡 Thêm danh sách chức danh/tiêu đề nghề nghiệp thực tế cho ứng viên
+        $jobTitles = [
+            'Lập trình viên ReactJS', 'Backend Developer (Laravel)', 'Chuyên viên Marketing Online',
+            'Kế toán tổng hợp', 'Nhân viên Hành chính Nhân sự', 'Chuyên viên Phân tích Dữ liệu',
+            'Thiết kế đồ họa (UI/UX Designer)', 'Quản lý dự án (Project Manager)', 
+            'Kỹ sư Cầu nối (Bridge Engineer)', 'Chuyên viên Tư vấn Tuyển dụng'
+        ];
+
         // Tạo username ngẫu nhiên để làm link profile không bị dính chữ facebook
         $username = Str::slug($this->faker->userName(), ''); 
 
@@ -24,6 +33,7 @@ class CandidateFactory extends Factory
             'user_id' => User::factory(),
             'cv_template_id' => $this->faker->numberBetween(1, 5),
             'category_id' => $this->faker->numberBetween(1, 10),
+            'title' => $this->faker->randomElement($jobTitles), // 💡 ĐÃ THÊM: Tiêu đề nghề nghiệp ứng viên
             'full_name' => $this->faker->randomElement($vietnameseNames), 
             'gender' => $this->faker->randomElement(['Nam', 'Nữ']),
             'birthday' => $this->faker->date('Y-m-d', '-22 years'),

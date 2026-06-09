@@ -17,6 +17,7 @@ class Candidate extends Model
         'user_id',
         'cv_template_id',
         'category_id',
+        'title',
         'full_name',
         'gender',
         'birthday',

@@ -17,6 +17,7 @@ class Application extends Model
         'description',
         'matching_score',
         'status',
+        'status_details',
         'applied_at',
     ];
 
@@ -25,6 +26,7 @@ class Application extends Model
         return [
             'applied_at' => 'datetime',
             'matching_score' => 'float',
+            'status_details' => 'array'
         ];
     }
 

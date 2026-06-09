@@ -19,6 +19,11 @@ class Company extends Model
         'business_license',
         'website_url',
         'description',
+        'industry', 
+        'size', 
+        'founded_year', 
+        'address', 
+        'benefits',
         'is_verified',
     ];
 
