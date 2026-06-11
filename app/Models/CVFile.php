@@ -4,17 +4,22 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes; // 🚀 1. Thêm dòng này
 
 class CvFile extends Model
 {
+    use SoftDeletes; // 🚀 2. Kích hoạt tính năng xóa mềm
+
+    protected $dates = ['deleted_at']; // Định nghĩa cột thời gian xóa
     protected $table = 'cv_files';
     public $timestamps = false;
 
     protected $fillable = [
-        'candidate_id',
+        'user_id',
         'file_name',
         'file_path',
         'file_size',
+        'type',
         'uploaded_at',
     ];
 
@@ -26,8 +31,8 @@ class CvFile extends Model
         ];
     }
 
-    public function candidate(): BelongsTo
+    public function user(): BelongsTo
     {
-        return $this->belongsTo(Candidate::class, 'candidate_id', 'id');
+        return $this->belongsTo(User::class, 'user_id', 'id');
     }
 }

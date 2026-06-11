@@ -13,77 +13,50 @@ use App\Models\User;
 use App\Models\Candidate;
 class UserController extends Controller
 {
-  public function userProfile()
-  {
+public function userProfile()
+{
     try {
-      $userId = Auth::id();
+        $userId = Auth::id();
 
-      if (!$userId) {
+        if (!$userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Chưa đăng nhập hoặc Token không hợp lệ.'
+            ], 401);
+        }
+
+        // 1. Kiểm tra tài khoản user có tồn tại không
+        $user = User::find($userId);
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Không tìm thấy tài khoản.'
+            ], 404);
+        }
+
+        // 🚀 SỬA TỪ ĐÂY: KHÔNG TỰ ĐỘNG CREATE NỮA!
+        // Chỉ lấy dữ liệu ra thôi, có thì dùng, không có thì trả về null
+        $data = User::select('id', 'email', 'role', 'status')
+            ->with([
+                'candidate' => function ($query) {
+                    $query->select('id', 'user_id', 'cv_template_id', 'category_id', 'title', 'full_name', 'gender', 'birthday', 'phone', 'email', 'address', 'avatar_url');
+                }
+            ])
+            ->find($userId);
+
         return response()->json([
-          'success' => false,
-          'message' => 'Chưa đăng nhập hoặc Token không hợp lệ.'
-        ], 401);
-      }
-
-      // 1. Kiểm tra tài khoản user có tồn tại không
-      $user = User::find($userId);
-      if (!$user) {
-        return response()->json([
-          'success' => false,
-          'message' => 'Không tìm thấy tài khoản.'
-        ], 404);
-      }
-
-      // 2. Kiểm tra xem đã có bản ghi bên bảng candidates chưa
-      $candidate = Candidate::where('user_id', $userId)->first();
-
-      if (!$candidate) {
-        // 💡 GIẢI PHÁP CHO LỖI 500: Điền đầy đủ các cột NOT NULL theo file Csdl_19.docx
-        // Bạn hãy kiểm tra trong DB xem bảng 'categories' và 'cv_templates' đã có dữ liệu chưa.
-        // Nếu chưa có, hãy chạy Seeder hoặc thêm thủ công 1 bản ghi có id = 1 vào 2 bảng đó trước nhé!
-        $candidate = Candidate::create([
-          'user_id' => $userId,
-          'cv_template_id' => 1, // Điền ID mặc định để tránh lỗi database ràng buộc
-          'category_id' => 1, // Điền ID ngành nghề mặc định
-          'title' => '',
-          'full_name' => 'Ứng viên mới',
-          'gender' => 'Nam',
-          'birthday' => now()->format('Y-m-d'),
-          'phone' => '',
-          'email' => $user->email,
-          'address' => '',
-          'summary' => '',
-          'objective' => '',
-          'avatar_url' => 'uploads/avatars/default-avatar.png'
-        ]);
-      }
-
-      // 3. Lấy dữ liệu trọn vẹn (Bắt buộc phải có cột 'id' trong select của User)
-      $data = User::select('id', 'email', 'role', 'status')
-        ->with([
-          'candidate' => function ($query) {
-            // Đảm bảo lấy đủ các trường cốt lõi, bắt buộc phải có 'user_id' và 'id'
-            $query->select('id', 'user_id', 'cv_template_id', 'category_id', 'title', 'full_name', 'gender', 'birthday', 'phone', 'email', 'address', 'avatar_url');
-          }
-        ])
-        ->find($userId);
-
-      return response()->json([
-        'success' => true,
-        'message' => 'Tải thông tin hồ sơ thành công!',
-        'data' => $data
-      ], 200);
+            'success' => true,
+            'message' => 'Tải thông tin hồ sơ thành công!',
+            'data' => $data
+        ], 200);
 
     } catch (\Exception $e) {
-      // 💡 BẮT LỖI NGẦM: Nếu vẫn bị 500, đoạn này sẽ bắt lại và trả về câu thông báo lỗi chính xác của MySQL để bạn biết đường sửa!
-      return response()->json([
-        'success' => false,
-        'message' => 'Lỗi hệ thống (500): ' . $e->getMessage(),
-        'file' => $e->getFile(),
-        'line' => $e->getLine()
-      ], 500);
+        return response()->json([
+            'success' => false,
+            'message' => 'Lỗi hệ thống (500): ' . $e->getMessage(),
+        ], 500);
     }
-  }
+}
 
   // Hàm sửa thông tin tài khoản & upload Avatar
   public function updateProfile(Request $request)
@@ -156,7 +129,7 @@ class UserController extends Controller
       $fileName = 'avatar_' . $user->id . '_' . time() . '.' . $file->getClientOriginalExtension();
 
       // Định nghĩa thư mục đích: public/uploads/avatars
-      $destinationPath = public_path('uploads/avatars');
+      $destinationPath = public_path('avatars');
 
       // Nếu thư mục chưa tồn tại thì tự động tạo mới thư mục với quyền ghi (0755)
       if (!File::exists($destinationPath)) {
@@ -167,7 +140,7 @@ class UserController extends Controller
       $file->move($destinationPath, $fileName);
 
       // Gán đường dẫn tương đối vào mảng để chuẩn bị lưu vào Database
-      $updateData['avatar_url'] = 'uploads/avatars/' . $fileName;
+      $updateData['avatar_url'] = 'avatars/' . $fileName;
     }
 
     // 4. Tiến hành cập nhật dữ liệu vào bảng 'candidates' trong DB

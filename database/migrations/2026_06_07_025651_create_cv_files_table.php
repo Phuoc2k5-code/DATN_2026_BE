@@ -13,11 +13,12 @@ return new class extends Migration
     {
         Schema::create('cv_files', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('candidate_id')->constrained('candidates')->onDelete('cascade');
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
             $table->string('file_name');
             $table->string('file_path');
             $table->integer('file_size'); // Đơn vị tính: Bytes hoặc KB
-            $table->timestamp('uploaded_at')->useCurrent();
+            $table->string('type')->default('uploaded');
+            $table->timestamps();
         });
     }
 
