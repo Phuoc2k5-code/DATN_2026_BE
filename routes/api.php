@@ -32,4 +32,8 @@ Route::middleware('auth:sanctum')->group(function(){
     Route::get('/cv-management/getDataCV', [CandidateController::class, 'getDataCV']);
     Route::post('/cv-management/updateCvTemplate/{id}', [CandidateController::class, 'updateCVTemplate']);
     Route::post('/cv-management/upload-cv', [CVFileController::class, 'uploadCV']);
+    Route::delete('/cv-management/destroy-file', [CVFileController::class, 'destroyFile']);
+    Route::get('/cv-management/download-cv', [CVFileController::class, 'downloadAndSaveCV']);
+    Route::get('/cv-management/download-cv/{id}', [CVFileController::class, 'downloadAndSaveCV']);
+
 });
