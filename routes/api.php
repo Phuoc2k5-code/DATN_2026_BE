@@ -9,6 +9,7 @@ use App\Http\Controllers\Candidate\WishlistController;
 use App\Http\Controllers\Candidate\AppliedJobController;
 use App\Http\Controllers\Candidate\CandidateController;
 use App\Http\Controllers\Candidate\CVFileController;
+use App\Http\Controllers\Employer\CompanyController;
 
 
 Route::post('/login-user', [LoginController::class, 'LoginUser']);
@@ -35,5 +36,7 @@ Route::middleware('auth:sanctum')->group(function(){
     Route::delete('/cv-management/destroy-file', [CVFileController::class, 'destroyFile']);
     Route::get('/cv-management/download-cv', [CVFileController::class, 'downloadAndSaveCV']);
     Route::get('/cv-management/download-cv/{id}', [CVFileController::class, 'downloadAndSaveCV']);
+    Route::get('/employer/company', [CompanyController::class, 'getOwnCompany']);
+    Route::post('/employer/company/update', [CompanyController::class, 'updateOwnCompany']);
 
 });
