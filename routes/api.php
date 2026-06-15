@@ -12,8 +12,8 @@ use App\Http\Controllers\Candidate\CandidateController;
 use App\Http\Controllers\Candidate\CVFileController;
 use App\Http\Controllers\Candidate\AIController;
 use App\Http\Controllers\Employer\CompanyController;
-
-
+use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Admin\CvTemplateController;
 
 Route::post('/login-user', [LoginController::class, 'LoginUser']);
 Route::post('/login-admin', [LoginController::class, 'LoginAdmin']);
@@ -35,6 +35,7 @@ Route::middleware('auth:sanctum')->group(function(){
     Route::get('get-category', [CandidateController::class, 'getFormData']);
     Route::delete('/delete-candidate', [CandidateController::class, 'deleteCandidate']);
     Route::get('/cv-management', [CandidateController::class, 'index']);
+    Route::get('/cv-templates', [CvTemplateController::class, 'index']);
     Route::get('/cv-management/preview-cv', [CandidateController::class, 'previewCV']);
     Route::post('/cv-management/updateCvTemplate/{id}', [CandidateController::class, 'updateCVTemplate']);
     Route::post('/cv-management/upload-cv', [CVFileController::class, 'uploadCV']);
@@ -48,6 +49,19 @@ Route::middleware('auth:sanctum')->group(function(){
     Route::post('/reports', [ReportController::class, 'store']);
     Route::get('/employer/company', [CompanyController::class, 'getOwnCompany']);
     Route::post('/employer/company/update', [CompanyController::class, 'updateOwnCompany']);
+});
 
+Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function () {
+    Route::get('/users-except-admin', [AdminUserController::class, 'getUsersExceptAdmin']);
+    Route::delete('/users/{id}/lock', [AdminUserController::class, 'lockUser']);
+    Route::patch('/users/{id}/unlock', [AdminUserController::class, 'unlockUser']);
+    Route::get('/violation-reports', [ReportController::class, 'getViolationReports']);
+    Route::get('/reports/{id}', [ReportController::class, 'showReportDetail']);
+    Route::patch('/reports/{id}/resolve', [ReportController::class, 'resolveReport']);
+    Route::patch('/reports/{id}/dismiss', [ReportController::class, 'dismissReport']);
+    Route::get('/cv-templates-management', [CvTemplateController::class, 'index']);
+    Route::post('/create-cv-template', [CvTemplateController::class, 'store']);
+    Route::put('/update-cv-templates/{id}', [CvTemplateController::class, 'update']);
+    Route::delete('/delete-cv-templates/{id}', [CvTemplateController::class, 'destroy']);
 
 });

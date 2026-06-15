@@ -332,7 +332,7 @@ class CandidateController extends Controller
     }
   }
 
-  // hàm hiện dữ liệu 
+  // hàm hiện dữ liệu lên FE để người dùng preview 
   public function previewCV(Request $request)
   {
     $userId = Auth::id();

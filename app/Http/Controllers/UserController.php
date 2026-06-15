@@ -44,16 +44,6 @@ class UserController extends Controller
         ])
         ->find($userId);
 
-      // Nếu không có thông tin candidate (hồ sơ chưa được tạo)
-      if (!$data || !$data->candidate) {
-        return response()->json([
-          'success' => false,
-          'has_profile' => false, // Thêm flag này để frontend dễ check bằng boolean nếu cần
-          'message' => 'Bạn chưa tạo hồ sơ ứng viên.'
-        ], 200);
-        // Lưu ý: Bạn có thể để 200 kèm success false, hoặc đổi thành 404 tùy cấu trúc API của bạn.
-      }
-
       return response()->json([
         'success' => true,
         'message' => 'Tải thông tin hồ sơ thành công!',

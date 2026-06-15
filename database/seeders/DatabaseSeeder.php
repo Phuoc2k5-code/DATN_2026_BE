@@ -77,27 +77,27 @@ class DatabaseSeeder extends Seeder
         $templates = [
             [
                 'name' => 'Mẫu CV Hiện đại',
-                'thumbnail_url' => 'uploads/templates/hiendai.png',
+                'description' => 'Thiết kế năng động, bố cục phá cách, cực kỳ phù hợp cho các ngành Công nghệ, Marketing hoặc Sáng tạo nội dung.',
                 'file_path' => 'modern'
             ],
             [
                 'name' => 'Mẫu CV Cổ điển',
-                'thumbnail_url' => 'uploads/templates/codien.png',
+                'description' => 'Bố cục truyền thống, rõ ràng và tập trung mạnh vào kinh nghiệm làm việc. Thích hợp cho khối ngành Kế toán, Ngân hàng, Luật.',
                 'file_path' => 'classic'
             ],
             [
                 'name' => 'Mẫu CV Thanh lịch',
-                'thumbnail_url' => 'uploads/templates/thanhlich.png',
+                'description' => 'Sự kết hợp tinh tế giữa màu sắc nhẹ nhàng và font chữ chuyên nghiệp, tạo ấn tượng tốt cho các vị trí Hành chính, Nhân sự, Giáo dục.',
                 'file_path' => 'elegant'
             ],
             [
                 'name' => 'Mẫu CV Sáng tạo',
-                'thumbnail_url' => 'uploads/templates/sangtao.png',
+                'description' => 'Đầy màu sắc và điểm nhấn cá tính, giúp các ứng viên thuộc khối ngành Thiết kế, Nghệ thuật, Kiến trúc nổi bật trong mắt nhà tuyển dụng.',
                 'file_path' => 'creative'
             ],
             [
                 'name' => 'Mẫu CV Tối giản',
-                'thumbnail_url' => 'uploads/templates/toigian.png',
+                'description' => 'Phong cách tối giản cơ bản (Minimalist), lược bỏ chi tiết thừa để làm nổi bật kỹ năng và thành tựu kỹ thuật. Thích hợp cho các kỹ sư, Developer.',
                 'file_path' => 'tech-minimalist'
             ]
         ];
