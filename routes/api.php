@@ -11,6 +11,8 @@ use App\Http\Controllers\Candidate\AppliedJobController;
 use App\Http\Controllers\Candidate\CandidateController;
 use App\Http\Controllers\Candidate\CVFileController;
 use App\Http\Controllers\Candidate\AIController;
+use App\Http\Controllers\Employer\CompanyController;
+
 
 
 Route::post('/login-user', [LoginController::class, 'LoginUser']);
@@ -44,4 +46,8 @@ Route::middleware('auth:sanctum')->group(function(){
     Route::get('/user-cv-list', [AIController::class, 'getUserCvList']);
     Route::get('/ai-recomment', [AIController::class, 'getRecommendations']);
     Route::post('/reports', [ReportController::class, 'store']);
+    Route::get('/employer/company', [CompanyController::class, 'getOwnCompany']);
+    Route::post('/employer/company/update', [CompanyController::class, 'updateOwnCompany']);
+
+
 });
