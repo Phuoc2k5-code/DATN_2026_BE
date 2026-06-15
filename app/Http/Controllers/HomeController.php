@@ -5,65 +5,102 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Job;
 use App\Models\Company;
+use App\Models\Application;
+use App\Models\Category;
 use Illuminate\Support\Facades\Auth;
 
 class HomeController extends Controller
 {
   public function index(Request $request)
-  {
-    try {
-      $userId = null;
+{
+  try {
+    $userId = null;
 
-      // 🔥 GIẢI PHÁP ĐỘC QUYỀN: Gọi thẳng Guard Sanctum để tự check token ngầm
-      // Nếu Header có token hợp lệ, hàm này tự bóc tách tìm ra User luôn.
-      // Nếu không có token (khách vãng lai), nó trả về null chứ KHÔNG báo lỗi 401 chặn trang.
-      $user = auth('sanctum')->user();
-
-      if ($user) {
-        $userId = $user->id;
-      }
-
-      // --- ĐOẠN DƯỚI GIỮ NGUYÊN HOÀN TOÀN ---
-      $savedJobIds = [];
-      if ($userId) {
-        $savedJobIds = \DB::table('wishlists')
-          ->where('user_id', $userId)
-          ->pluck('job_id')
-          ->toArray();
-      }
-
-      $query = Job::with(['company', 'category', 'skills'])
-        ->where('status', 'active');
-      // Sắp xếp theo tin đăng mới nhất và thực hiện phân trang (Ví dụ: 10 tin trên 1 trang)
-      $jobs = $query->latest('id')->paginate(9);
-
-      $jobs->getCollection()->transform(function ($job) use ($savedJobIds) {
-        $job->is_saved = in_array($job->id, $savedJobIds);
-        return $job;
-      });
-
-      // 6. Trả về dữ liệu JSON chuẩn API cho Frontend (ReactJS/Next.js) nhận diện
-      return response()->json([
-        'success' => true,
-        'message' => 'Lấy danh sách tin tuyển dụng thành công.',
-        'data' => $jobs->items(),
-        'pagination' => [
-          'current_page' => $jobs->currentPage(),
-          'last_page' => $jobs->lastPage(),
-          'per_page' => $jobs->perPage(),
-          'total' => $jobs->total(),
-        ],
-      ], 200);
-
-    } catch (\Exception $e) {
-      // Xử lý lỗi hệ thống nếu có phát sinh ngoại lệ
-      return response()->json([
-        'success' => false,
-        'message' => 'Đã xảy ra lỗi khi tải danh sách tin tuyển dụng.',
-        'error' => $e->getMessage()
-      ], 500);
+    // 🔥 Tự check token ngầm để lấy User ẩn danh hoặc đã đăng nhập
+    $user = auth('sanctum')->user();
+    if ($user) {
+      $userId = $user->id;
     }
+
+    $savedJobIds = [];
+    if ($userId) {
+      $savedJobIds = \DB::table('wishlists')
+        ->where('user_id', $userId)
+        ->pluck('job_id')
+        ->toArray();
+    }
+
+    // 1. Khởi tạo Query ban đầu
+    $query = Job::with(['company', 'category', 'skills'])
+      ->where('status', 'active');
+
+    // 2. 🔥 BỘ LỌC TÌM KIẾM THEO ĐIỀU KIỆN TỪ FRONTEND GỬI LÊN
+
+    // Lọc theo từ khóa (Keyword): Tìm theo tiêu đề job hoặc tên công ty
+    if ($request->has('keyword') && !empty($request->keyword)) {
+      $keyword = $request->keyword;
+      $query->where(function ($q) use ($keyword) {
+        $q->where('title', 'like', '%' . $keyword . '%')
+          ->orWhereHas('company', function ($companyQuery) use ($keyword) {
+              $companyQuery->where('company_name', 'like', '%' . $keyword . '%');
+          });
+      });
+    }
+
+    // Lọc theo Địa điểm (Location)
+    if ($request->has('location') && !empty($request->location)) {
+      $query->where('location', 'like', '%' . $request->location . '%');
+    }
+
+    // Lọc theo Ngành nghề (Category ID)
+    if ($request->has('category_id') && !empty($request->category_id)) {
+      // Nếu cột category_id trong bảng jobs là ID (số), hãy đảm bảo Frontend truyền lên ID.
+      // Còn nếu đang lưu thẳng chuỗi tên ngành nghề, điều kiện dưới đây vẫn đúng:
+      $query->where('category_id', $request->category_id);
+    }
+
+    // Lọc theo Cấp bậc (Level) - Frontend mặc định gửi "Nổi bật" nếu không chọn
+    if ($request->has('level') && !empty($request->level) && $request->level !== 'Nổi bật') {
+      $query->where('level', $request->level);
+    }
+
+    // Lọc theo khoảng Lương (Salary)
+    if ($request->has('salary_from') && !empty($request->salary_from)) {
+      $query->where('salary', '>=', $request->salary_from); // Thay 'salary' bằng tên cột tương ứng
+    }
+    if ($request->has('salary_to') && !empty($request->salary_to)) {
+      $query->where('salary', '<=', $request->salary_to);
+    }
+
+    // --- ĐOẠN DƯỚI GIỮ NGUYÊN HOÀN TOÀN ---
+    // Sắp xếp theo tin đăng mới nhất và thực hiện phân trang
+    $jobs = $query->latest('id')->paginate(9);
+
+    $jobs->getCollection()->transform(function ($job) use ($savedJobIds) {
+      $job->is_saved = in_array($job->id, $savedJobIds);
+      return $job;
+    });
+
+    return response()->json([
+      'success' => true,
+      'message' => 'Lấy danh sách tin tuyển dụng thành công.',
+      'data' => $jobs->items(),
+      'pagination' => [
+        'current_page' => $jobs->currentPage(),
+        'last_page' => $jobs->lastPage(),
+        'per_page' => $jobs->perPage(),
+        'total' => $jobs->total(),
+      ],
+    ], 200);
+
+  } catch (\Exception $e) {
+    return response()->json([
+      'success' => false,
+      'message' => 'Đã xảy ra lỗi khi tải danh sách tin tuyển dụng.',
+      'error' => $e->getMessage()
+    ], 500);
   }
+}
 
   public function JobDetail($id)
   {
@@ -79,12 +116,20 @@ class HomeController extends Controller
         'message' => 'Không tìm thấy tin tuyển dụng này hoặc tin đã bị xóa.'
       ], 404);
     }
+    // Kiểm tra xem User đăng nhập đã ứng tuyển chưa
+    $applicationStatus = false;
+    if (Auth::guard('sanctum')->check()) {
+        $applicationStatus = Application::where('job_id', $id)
+            ->where('user_id', Auth::guard('sanctum')->id())
+            ->value('status');
+    }
 
     // 3. Trả về dữ liệu công việc thành công
     return response()->json([
       'success' => true,
       'message' => 'Lấy thông tin chi tiết tin tuyển dụng thành công.',
-      'data' => $job // Trả về object công việc (không dùng ->items())
+      'data' => $job, // Trả về object công việc (không dùng ->items())
+      'application_status' => $applicationStatus
     ], 200);
   }
 
@@ -124,4 +169,24 @@ class HomeController extends Controller
       ], 500);
     }
   }
+
+  public function getCategories()
+{
+    try {
+        // Lấy ra id và name của tất cả ngành nghề
+        $categories = Category::select('id', 'name')->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $categories
+        ], 200);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Không thể lấy danh sách ngành nghề.',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
 }

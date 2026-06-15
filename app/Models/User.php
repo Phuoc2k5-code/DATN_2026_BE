@@ -66,4 +66,13 @@ class User extends Authenticatable
         return $this->hasMany(CvFile::class, 'user_id', 'id');
     }
 
+     public function applications(): HasMany
+    {
+        return $this->hasMany(Application::class, 'user_id', 'id');
+    }
+
+    public function reports(): HasMany
+    {
+        return $this->hasMany(Report::class, 'user_id', 'id');
+    }
 }

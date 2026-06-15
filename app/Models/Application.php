@@ -11,8 +11,7 @@ class Application extends Model
 
     protected $fillable = [
         'job_id',
-        'candidate_id',
-        'cv_type',
+        'user_id',
         'cv_file_id',
         'description',
         'matching_score',
@@ -35,9 +34,9 @@ class Application extends Model
         return $this->belongsTo(Job::class, 'job_id', 'id');
     }
 
-    public function candidate(): BelongsTo
+    public function user(): BelongsTo
     {
-        return $this->belongsTo(Candidate::class, 'candidate_id', 'id');
+        return $this->belongsTo(User::class, 'user_id', 'id');
     }
 
     public function cvFile(): BelongsTo

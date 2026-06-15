@@ -43,4 +43,9 @@ class Company extends Model
     {
         return $this->hasMany(Job::class, 'company_id', 'id');
     }
+
+    public function reports(): HasMany
+    {
+        return $this->hasMany(Report::class, 'company_id', 'id');
+    }
 }

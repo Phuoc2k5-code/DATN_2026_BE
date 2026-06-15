@@ -13,50 +13,60 @@ use App\Models\User;
 use App\Models\Candidate;
 class UserController extends Controller
 {
-public function userProfile()
-{
+  public function userProfile()
+  {
     try {
-        $userId = Auth::id();
+      $userId = Auth::id();
 
-        if (!$userId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Chưa đăng nhập hoặc Token không hợp lệ.'
-            ], 401);
-        }
-
-        // 1. Kiểm tra tài khoản user có tồn tại không
-        $user = User::find($userId);
-        if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Không tìm thấy tài khoản.'
-            ], 404);
-        }
-
-        // 🚀 SỬA TỪ ĐÂY: KHÔNG TỰ ĐỘNG CREATE NỮA!
-        // Chỉ lấy dữ liệu ra thôi, có thì dùng, không có thì trả về null
-        $data = User::select('id', 'email', 'role', 'status')
-            ->with([
-                'candidate' => function ($query) {
-                    $query->select('id', 'user_id', 'cv_template_id', 'category_id', 'title', 'full_name', 'gender', 'birthday', 'phone', 'email', 'address', 'avatar_url');
-                }
-            ])
-            ->find($userId);
-
+      if (!$userId) {
         return response()->json([
-            'success' => true,
-            'message' => 'Tải thông tin hồ sơ thành công!',
-            'data' => $data
+          'success' => false,
+          'message' => 'Chưa đăng nhập hoặc Token không hợp lệ.'
+        ], 401);
+      }
+
+      // 1. Kiểm tra tài khoản user có tồn tại không
+      $user = User::find($userId);
+      if (!$user) {
+        return response()->json([
+          'success' => false,
+          'message' => 'Không tìm thấy tài khoản.'
+        ], 404);
+      }
+
+      // 🚀 SỬA TỪ ĐÂY: KHÔNG TỰ ĐỘNG CREATE NỮA!
+      // Chỉ lấy dữ liệu ra thôi, có thì dùng, không có thì trả về null
+      $data = User::select('id', 'email', 'role', 'status')
+        ->with([
+          'candidate' => function ($query) {
+            $query->select('id', 'user_id', 'cv_template_id', 'category_id', 'title', 'full_name', 'gender', 'birthday', 'phone', 'email', 'address', 'avatar_url');
+          }
+        ])
+        ->find($userId);
+
+      // Nếu không có thông tin candidate (hồ sơ chưa được tạo)
+      if (!$data || !$data->candidate) {
+        return response()->json([
+          'success' => false,
+          'has_profile' => false, // Thêm flag này để frontend dễ check bằng boolean nếu cần
+          'message' => 'Bạn chưa tạo hồ sơ ứng viên.'
         ], 200);
+        // Lưu ý: Bạn có thể để 200 kèm success false, hoặc đổi thành 404 tùy cấu trúc API của bạn.
+      }
+
+      return response()->json([
+        'success' => true,
+        'message' => 'Tải thông tin hồ sơ thành công!',
+        'data' => $data
+      ], 200);
 
     } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Lỗi hệ thống (500): ' . $e->getMessage(),
-        ], 500);
+      return response()->json([
+        'success' => false,
+        'message' => 'Lỗi hệ thống (500): ' . $e->getMessage(),
+      ], 500);
     }
-}
+  }
 
   // Hàm sửa thông tin tài khoản & upload Avatar
   public function updateProfile(Request $request)

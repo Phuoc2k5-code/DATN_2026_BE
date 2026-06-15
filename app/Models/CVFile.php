@@ -12,7 +12,7 @@ class CvFile extends Model
 
     protected $dates = ['deleted_at']; // Định nghĩa cột thời gian xóa
     protected $table = 'cv_files';
-    public $timestamps = false;
+    public $timestamps = true;
 
     protected $fillable = [
         'user_id',
@@ -20,7 +20,7 @@ class CvFile extends Model
         'file_path',
         'file_size',
         'type',
-        'uploaded_at',
+        'updated_at',
     ];
 
     protected function casts(): array

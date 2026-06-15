@@ -68,4 +68,10 @@ class Job extends Model
     {
         return $this->hasMany(Wishlist::class, 'job_id', 'id');
     }
+
+    public function reports(): HasMany
+    {
+        return $this->hasMany(Report::class, 'job_id', 'id');
+    }
+
 }

@@ -4,322 +4,363 @@
     <meta charset="UTF-8">
     <title>CV - {{ $candidate->full_name }}</title>
     <style>
-        /* 1. KHẮC PHỤC LỖI FONT TIẾNG VIỆT & THIẾT LẬP KHỔ GIẤY CHUẨN ĐỒ ÁN */
+        /* 1. ĐỊNH DẠNG TRANG & SỬA LỖI Ô VUÔNG FONT */
         @page {
             size: a4 portrait;
-            margin: 20mm 15mm 20mm 15mm; /* Căn lề lọt lòng trang giấy */
+            margin: 12mm 12mm 12mm 12mm;
         }
         
+        html, body, div, p, span, table, tr, td, h1, h2, h3, h4, strong, b, i, em, a {
+            font-family: 'DejaVu Sans', sans-serif !important;
+        }
+
         body {
-            font-family: 'DejaVu Sans', serif; /* Thay Times New Roman bằng DejaVu Sans để hiển thị Tiếng Việt hoàn hảo */
-            font-size: 12px;
-            color: #0f172a; /* Tương đương text-slate-900 */
-            line-height: 1.6;
+            font-size: 12px; 
+            color: #0f172a; 
+            line-height: 1.4;
             margin: 0;
             padding: 0;
         }
 
-        /* 2. ĐỊNH DẠNG LAYOUT CHUẨN (Thay cho Flexbox/Grid của Tailwind) */
+        strong, b {
+            font-weight: bold;
+            color: #000000;
+        }
+        
+        i, em {
+            font-style: italic;
+        }
+
         .w-full {
             width: 100%;
         }
-        
-        .text-center {
-            text-align: center;
-        }
-        
-        .text-justify {
-            text-align: justify;
-        }
 
-        /* Phần đầu CV (Header) */
+        /* 2. HEADER SIÊU GỌN - XÓA BỎ BIỂU TƯỢNG LỖI */
         .header {
-            border-bottom: 2px solid #1e293b; /* Tương đương border-slate-800 */
-            padding-bottom: 12px;
-            margin-bottom: 20px;
+            border-bottom: 2px solid #1e293b; 
+            padding-bottom: 6px;
+            margin-bottom: 12px;
         }
 
         .full-name {
-            font-size: 22px;
+            font-size: 26px;
             font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin: 0 0 5px 0;
+            margin: 0 0 2px 0;
+            color: #0f172a;
         }
 
         .title {
-            font-size: 12px;
-            font-weight: 500;
-            color: #475569; /* Tương đương text-slate-600 */
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin: 0 0 8px 0;
+            font-size: 24px;
+            font-weight: bold;
+            color: #475569; 
+            margin: 0 0 5px 0;
         }
 
-        /* Thanh thông tin liên hệ */
-        .contact-bar {
+        /* Bảng thông tin liên hệ trơn - không sợ lỗi ô vuông */
+        .contact-table {
+            width: 100%;
             font-size: 11px;
-            color: #334155; /* Tương đương text-slate-700 */
-            font-weight: 500;
+            color: #475569;
+            margin-top: 5px;
         }
 
-        .divider {
-            color: #cbd5e1; /* Tương đương text-slate-300 */
-            padding: 0 5px;
+        .contact-table td {
+            padding: 2px 0;
+            vertical-align: top;
         }
 
-        /* Các khối nội dung (Sections) */
+        .contact-table a {
+            color: #1e293b;
+            text-decoration: none;
+        }
+
+        /* 3. LAYOUT 2 CỘT KHÔNG BỊ TRÀN GIẤY */
+        .main-layout {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .main-layout td {
+            vertical-align: top;
+        }
+
+        .left-column {
+            width: 63%;
+            padding-right: 15px;
+        }
+
+        .right-column {
+            width: 37%;
+            border-left: 1px solid #e2e8f0;
+            padding-left: 15px;
+        }
+
         .section {
-            margin-top: 20px;
+            margin-bottom: 12px;
         }
 
         .section-title {
-            font-size: 13px;
+            font-size: 13px; 
             font-weight: bold;
-            text-transform: uppercase;
             color: #0f172a;
-            border-bottom: 1px solid #cbd5e1; /* Tương đương border-slate-300 */
-            padding-bottom: 3px;
-            margin-bottom: 8px;
+            border-bottom: 1px solid #cbd5e1; 
+            padding-bottom: 2px;
+            margin-bottom: 6px;
+        }
+
+        /* FIX LỖI GIÃN CHỮ: Dùng text-align: left tuyệt đối */
+        .text-block-left {
+            color: #334155;
+            white-space: pre-line;
+            font-size: 11.5px;
+            text-align: left !important; /* Triệt tiêu hoàn toàn justify lỗi */
+        }
+
+        .info-row {
+            margin-bottom: 5px;
         }
 
         /* Kinh nghiệm & Dự án */
         .project-container {
-            border-left: 2px solid #e2e8f0; /* Tương đương border-slate-200 */
-            padding-left: 12px;
-            margin-top: 8px;
+            border-left: 2px solid #1e293b; 
+            padding-left: 8px;
         }
 
         .project-item {
-            margin-bottom: 15px;
+            margin-bottom: 8px;
         }
 
         .project-header-table td {
-            vertical-align: bottom;
+            vertical-align: top;
             font-size: 12px;
         }
 
         .project-title {
             font-weight: bold;
             color: #0f172a;
-            max-width: 75%;
         }
 
         .project-duration {
             font-size: 11px;
             font-style: italic;
             text-align: right;
+            white-space: nowrap;
         }
 
         .project-role {
             font-size: 11px;
-            color: #334155;
+            color: #475569;
             font-style: italic;
-            font-weight: 500;
-            margin: 2px 0 4px 0;
+            margin: 1px 0;
         }
 
         .project-desc {
-            color: #475569; /* Tương đương text-slate-600 */
-            white-space: pre-line; /* Giữ nguyên xuống dòng dấu gạch đầu dòng */
+            color: #334155; 
+            white-space: pre-line; 
             margin: 0;
-            padding-left: 4px;
+            text-align: left; /* Căn trái toàn bộ phần mô tả */
         }
 
-        /* Học vấn & Giới thiệu */
-        .text-block {
-            color: #334155;
-            white-space: pre-line;
-        }
-
-        /* Kỹ năng chuyên môn (Thay Grid 2 cột bằng Table) */
-        .skills-table {
-            width: 100%;
-            margin-left: 10px;
-        }
-
-        .skills-table td {
-            width: 50%; /* Chia đôi 2 cột như grid-cols-2 */
-            padding: 4px 15px 4px 0;
-            border-bottom: 1px solid #f1f5f9; /* Tương đương border-slate-100 */
-            font-size: 11px;
+        /* Danh sách kỹ năng bên phải */
+        .skills-list {
+            margin: 0;
+            padding: 0 0 0 12px;
+            font-size: 11.5px;
             color: #334155;
         }
 
-        .bullet {
-            color: #94a3b8; /* Tương đương text-slate-400 */
-            font-size: 8px;
-            vertical-align: middle;
-            margin-right: 4px;
+        .skills-list li {
+            margin-bottom: 4px;
         }
 
         /* Người tham chiếu */
         .reference-item {
-            border-left: 2px solid #cbd5e1; /* Tương đương border-slate-300 */
-            padding-left: 10px;
-            margin-bottom: 10px;
+            margin-bottom: 6px;
+            font-size: 11.5px;
         }
 
         .ref-name {
             font-weight: bold;
             color: #1e293b;
-            font-size: 12px;
             margin: 0;
         }
 
         .ref-relation {
-            color: #b45309; /* Tương đương text-amber-700 */
+            color: #b45309; 
             font-style: italic;
-            font-weight: 500;
-            font-size: 11px;
-            margin: 1px 0;
+            margin: 0;
         }
 
         .ref-phone {
-            color: #64748b; /* Tương đương text-slate-500 */
-            font-size: 11px;
+            color: #64748b; 
             margin: 0;
         }
     </style>
 </head>
 <body>
 
-    <div class="header text-center">
-        <h1 class="full-name">{{ $candidate->full_name }}</h1>
-        <p class="title">{{ $candidate->title ?? 'Chuyên viên ứng tuyển' }}</p>
+    <!-- HEADER SIÊU GỌN -->
+    <div class="header">
+        <table class="w-full" cellpadding="0" cellspacing="0">
+            <tr>
+                <td style="vertical-align: bottom;">
+                    <h1 class="full-name">{{ $candidate->full_name }}</h1>
+                </td>
+                <td style="text-align: right; vertical-align: bottom; padding-bottom: 3px;">
+                    <span class="title">{{ $candidate->title ?? 'Chuyên viên ứng tuyển' }}</span>
+                </td>
+            </tr>
+        </table>
 
-        <div class="contact-bar">
-            <span>📅 {{ \Carbon\Carbon::parse($candidate->birthday)->format('d/m/Y') }} ({{ $candidate->gender || 'Nam' }})</span>
-            <span class="divider">|</span>
-            <span>📞 {{ $candidate->phone }}</span>
-            <span class="divider">|</span>
-            <span>✉️ {{ $candidate->email }}</span>
-            <span class="divider">|</span>
-            <span>📍 {{ $candidate->address }}</span>
-        </div>
-    </div>
-
-    <div class="section">
-        <div class="section-title">Giới thiệu & Mục tiêu nghề nghiệp</div>
-        <div class="text-justify" style="font-size: 11px; color: #334155;">
-            <p style="margin: 0 0 5px 0; font-style: italic;">
-                <strong style="font-style: normal; color: #0f172a;">Giới thiệu: </strong>{{ $candidate->summary }}
-            </p>
-            <p style="margin: 0 0 5px 0; font-style: italic;">
-                <strong style="font-style: normal; color: #0f172a;">Mục tiêu: </strong>{{ $candidate->objective }}
-            </p>
-            <p style="margin: 5px 0 0 0; font-weight: bold; color: #475569; font-size: 10px;">
-                Tổng thời gian tích lũy kinh nghiệm thực chiến: {{ $candidate->experience_years }} năm.
-            </p>
-        </div>
-    </div>
-
-    <div class="section">
-        <div class="section-title">Kinh nghiệm làm việc & Dự án tiêu biểu</div>
-        <div class="project-container">
-            @php
-                // Giải mã JSON an toàn từ DB của bảng candidates trường project
-                $projects = [];
-                if (is_string($candidate->project)) {
-                    $projects = json_decode($candidate->project, true) ?: [];
-                } elseif (is_array($candidate->project)) {
-                    $projects = $candidate->project;
+        @php
+            $socials = [];
+            if (isset($candidate->links)) {
+                if (is_string($candidate->links)) {
+                    $socials = json_decode($candidate->links, true) ?: [];
+                } elseif (is_array($candidate->links)) {
+                    $socials = $candidate->links;
                 }
-            @endphp
+            }
+        @endphp
 
-            @if(count($projects) > 0)
-                @foreach($projects as $proj)
-                    <div class="project-item">
-                        <table class="w-full project-header-table" cellpadding="0" cellspacing="0">
-                            <tr>
-                                <td class="project-title">{{ strtoupper($proj['project_name'] ?? ($proj['name'] ?? 'TÊN DỰ ÁN')) }}</td>
-                                <td class="project-duration">({{ $proj['duration'] ?? 'Chưa cập nhật' }})</td>
-                            </tr>
-                        </table>
-
-                        @if(isset($proj['role']))
-                            <p class="project-role">Vị trí: {{ $proj['role'] }}</p>
-                        @endif
-
-                        @if(isset($proj['description']))
-                            <p class="project-desc text-justify">{{ $proj['description'] }}</p>
-                        @endif
-                    </div>
-                @endforeach
-            @else
-                <p style="font-size: 11px; color: #94a3b8; font-style: italic;">Chưa có thông tin dự án.</p>
-            @endif
-        </div>
+        <!-- FIX LỖI Ô VUÔNG: Thay emoji bằng text sạch -->
+        <table class="contact-table" cellpadding="0" cellspacing="0">
+            <tr>
+                <td style="width: 35%;">Ngày sinh: {{ \Carbon\Carbon::parse($candidate->birthday)->format('d/m/Y') }} ({{ $candidate->gender || 'Nam' }})</td>
+                <td style="width: 30%; text-align: center;">SĐT: {{ $candidate->phone }}</td>
+                <td style="width: 35%; text-align: right;">Email: {{ $candidate->email }}</td>
+            </tr>
+            <tr>
+                <td>Địa chỉ: {{ $candidate->address }}</td>
+                <td style="text-align: center;">
+                    @if(!empty($socials['github'])) GitHub: <a href="{{ $socials['github'] }}" target="_blank">Link</a> @endif
+                </td>
+                <td style="text-align: right;">
+                    @if(!empty($socials['linkedin'])) LinkedIn: <a href="{{ $socials['linkedin'] }}" target="_blank">Link</a> @endif
+                </td>
+            </tr>
+        </table>
     </div>
 
-    <div class="section">
-        <div class="section-title">Học Vấn & Bằng Cấp</div>
-        <div class="text-block text-justify" style="font-size: 11px; padding-left: 4px;">{!! nl2br(e($candidate->education)) !!}</div>
-    </div>
-
-    <div class="section">
-        <div class="section-title">Kỹ năng chuyên môn</div>
-        @if($candidate->skills && count($candidate->skills) > 0)
-            <table class="skills-table" cellpadding="0" cellspacing="0">
-                @foreach($candidate->skills->chunk(2) as $row)
-                    <tr>
-                        @foreach($row as $skill)
-                            <td>
-                                <span class="bullet">●</span> 
-                                <strong>{{ $skill->name }}</strong> 
-                                @if(isset($skill->pivot->level))
-                                    ({{ $skill->pivot->level }})
-                                @endif
-                            </td>
-                        @endforeach
-                        @if(count($row) < 2)
-                            <td></td>
-                        @endif
-                    </tr>
-                @endforeach
-            </table>
-        @else
-            <p style="font-size: 11px; color: #94a3b8; font-style: italic; padding-left: 4px;">Chưa cập nhật kỹ năng.</p>
-        @endif
-    </div>
-
-    <div class="section">
-        <div class="section-title">🤝 Người xác nhận thông tin (Reference)</div>
-        <div style="padding-left: 4px; margin-top: 8px;">
-            @php
-                $references = [];
-                if (is_string($candidate->contact_reference)) {
-                    $references = json_decode($candidate->contact_reference, true) ?: $candidate->contact_reference;
-                } else {
-                    $references = $candidate->contact_reference;
-                }
-            @endphp
-
-            @if(is_array($references))
-                @// Kiểm tra nếu là mảng danh sách nhiều người xác nhận
-                @if(isset($references[0]) && is_array($references[0]))
-                    @foreach($references as $ref)
-                        <div class="reference-item">
-                            <p class="ref-name">{{ $ref['name'] ?? 'Họ và tên' }}</p>
-                            @if(isset($ref['relationship'])) <p class="ref-relation">Mối quan hệ: {{ $ref['relationship'] }}</p> @endif
-                            @if(isset($ref['phone'])) <p class="ref-phone">SĐT: {{ $ref['phone'] }}</p> @endif
+    <!-- LAYOUT 2 CỘT TỐI ƯU KHÔNG GIAN -->
+    <table class="main-layout" cellpadding="0" cellspacing="0">
+        <tr>
+            <!-- CỘT TRÁI (NỘI DUNG DÀI) -->
+            <td class="left-column">
+                
+                <div class="section">
+                    <div class="section-title">Giới thiệu & Mục tiêu nghề nghiệp</div>
+                    <div class="text-block-left">
+                        <div class="info-row"><strong>Giới thiệu:</strong> <i>{{ $candidate->summary }}</i></div>
+                        <div class="info-row"><strong>Mục tiêu:</strong> <i>{{ $candidate->objective }}</i></div>
+                        <div style="margin-top: 5px; font-weight: bold; color: #475569; font-size: 11px;">
+                            Tổng thời gian tích lũy kinh nghiệm thực chiến: {{ $candidate->experience_years }} năm.
                         </div>
-                    @endforeach
-                @else
-                    @// Nếu chỉ là 1 Object đơn lẻ
-                    <div class="reference-item">
-                        <p class="ref-name">{{ $references['name'] ?? 'Họ và tên' }}</p>
-                        @if(isset($references['relationship'])) <p class="ref-relation">Mối quan hệ: {{ $references['relationship'] }}</p> @endif
-                        @if(isset($references['phone'])) <p class="ref-phone">SĐT: {{ $references['phone'] }}</p> @endif
                     </div>
-                @endif
-            @elseif(is_string($references) && !empty($references))
-                <p class="text-block" style="font-size: 11px;">{!! nl2br(e($references)) !!}</p>
-            @else
-                <p style="font-size: 11px; color: #94a3b8; font-style: italic;">Chưa có thông tin người xác nhận.</p>
-            @endif
-        </div>
-    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">Kinh nghiệm làm việc & Dự án tiêu biểu</div>
+                    <div class="project-container">
+                        @php
+                            $projects = [];
+                            if (is_string($candidate->project)) {
+                                $projects = json_decode($candidate->project, true) ?: [];
+                            } elseif (is_array($candidate->project)) {
+                                $projects = $candidate->project;
+                            }
+                        @endphp
+
+                        @if(count($projects) > 0)
+                            @foreach($projects as $proj)
+                                <div class="project-item">
+                                    <table class="w-full project-header-table" cellpadding="0" cellspacing="0">
+                                        <tr>
+                                            <td class="project-title">{{ $proj['project_name'] ?? ($proj['name'] ?? 'Tên dự án') }}</td>
+                                            <td class="project-duration">({{ $proj['duration'] ?? 'Chưa cập nhật' }})</td>
+                                        </tr>
+                                    </table>
+                                    @if(isset($proj['role']))
+                                        <p class="project-role">Vị trí: {{ $proj['role'] }}</p>
+                                    @endif
+                                    @if(isset($proj['description']))
+                                        <p class="project-desc">{{ $proj['description'] }}</p>
+                                    @endif
+                                </div>
+                            @endforeach
+                        @else
+                            <p style="font-size: 11.5px; color: #94a3b8; font-style: italic;">Chưa có thông tin dự án.</p>
+                        @endif
+                    </div>
+                </div>
+
+            </td>
+
+            <!-- CỘT PHẢI (DANH MỤC NGẮN) -->
+            <td class="right-column">
+                
+                <div class="section">
+                    <div class="section-title">Học Vấn & Bằng Cấp</div>
+                    <div class="text-block-left">{!! nl2br(e($candidate->education)) !!}</div>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">Kỹ năng chuyên môn</div>
+                    @if($candidate->skills && count($candidate->skills) > 0)
+                        <ul class="skills-list">
+                            @foreach($candidate->skills as $skill)
+                                <li>
+                                    <strong>{{ $skill->name }}</strong>
+                                    @if(isset($skill->pivot->level))
+                                        <span style="color: #64748b; font-size: 10.5px;">({{ $skill->pivot->level }})</span>
+                                    @endif
+                                </li>
+                            @endforeach
+                        </ul>
+                    @else
+                        <p style="font-size: 11px; color: #94a3b8; font-style: italic;">Chưa cập nhật kỹ năng.</p>
+                    @endif
+                </div>
+
+                <div class="section">
+                    <div class="section-title">Người xác nhận (Reference)</div>
+                    <div>
+                        @php
+                            $references = [];
+                            if (is_string($candidate->contact_reference)) {
+                                $references = json_decode($candidate->contact_reference, true) ?: $candidate->contact_reference;
+                            } else {
+                                $references = $candidate->contact_reference;
+                            }
+                        @endphp
+
+                        @if(is_array($references))
+                            @if(isset($references[0]) && is_array($references[0]))
+                                @foreach($references as $ref)
+                                    <div class="reference-item">
+                                        <p class="ref-name">{{ $ref['name'] ?? 'Họ và tên' }}</p>
+                                        @if(isset($ref['relationship'])) <p class="ref-relation">{{ $ref['relationship'] }}</p> @endif
+                                        @if(isset($ref['phone'])) <p class="ref-phone">SĐT: {{ $ref['phone'] }}</p> @endif
+                                    </div>
+                                @endforeach
+                            @else
+                                <div class="reference-item">
+                                    <p class="ref-name">{{ $references['name'] ?? 'Họ và tên' }}</p>
+                                    @if(isset($references['relationship'])) <p class="ref-relation">{{ $references['relationship'] }}</p> @endif
+                                    @if(isset($references['phone'])) <p class="ref-phone">SĐT: {{ $references['phone'] }}</p> @endif
+                                </div>
+                            @endif
+                        @elseif(is_string($references) && !empty($references))
+                            <div class="text-block-left" style="font-size: 11.5px;">{!! nl2br(e($references)) !!}</div>
+                        @else
+                            <p style="font-size: 11px; color: #94a3b8; font-style: italic;">Chưa có thông tin.</p>
+                        @endif
+                    </div>
+                </div>
+
+            </td>
+        </tr>
+    </table>
 
 </body>
 </html>

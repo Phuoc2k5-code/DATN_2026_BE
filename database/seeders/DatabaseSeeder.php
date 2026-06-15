@@ -78,27 +78,27 @@ class DatabaseSeeder extends Seeder
             [
                 'name' => 'Mẫu CV Hiện đại',
                 'thumbnail_url' => 'uploads/templates/hiendai.png',
-                'file_path' => 'templates/ModernCVTemplate.jsx'
+                'file_path' => 'modern'
             ],
             [
                 'name' => 'Mẫu CV Cổ điển',
                 'thumbnail_url' => 'uploads/templates/codien.png',
-                'file_path' => 'templates/ClassicCVTemplate.jsx'
+                'file_path' => 'classic'
             ],
             [
                 'name' => 'Mẫu CV Thanh lịch',
                 'thumbnail_url' => 'uploads/templates/thanhlich.png',
-                'file_path' => 'templates/ElegantCVTemplate.jsx'
+                'file_path' => 'elegant'
             ],
             [
                 'name' => 'Mẫu CV Sáng tạo',
                 'thumbnail_url' => 'uploads/templates/sangtao.png',
-                'file_path' => 'templates/CreativeCVTemplate.jsx'
+                'file_path' => 'creative'
             ],
             [
                 'name' => 'Mẫu CV Tối giản',
                 'thumbnail_url' => 'uploads/templates/toigian.png',
-                'file_path' => 'templates/TechMinimalistTemplate.jsx'
+                'file_path' => 'tech-minimalist'
             ]
         ];
         foreach ($templates as $tmpl) {
@@ -134,28 +134,7 @@ class DatabaseSeeder extends Seeder
                 'type' => $type,
                 'created_at' => Carbon::now(),
                 'updated_at' => Carbon::now()
-            ]);
-
-            // 🚀 BỔ SUNG: Giả lập thêm dữ liệu phân tích mẫu cho AI để hệ thống có data chạy mượt
-            $aiAnalysisId = DB::table('ai_cv_analyses')->insertGetId([
-                'cv_file_id' => $cvFileId,
-                'cv_title' => fake()->randomElement(['Nodejs Developer', 'ReactJS Engineer', 'Marketing Executive', 'Kế toán trưởng']),
-                'job_category' => fake()->randomElement(['Công nghệ thông tin', 'Marketing / PR', 'Kế toán / Kiểm toán']),
-                'experience_year' => rand(1, 10),
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now()
-            ]);
-
-            // Seed thêm luôn vài kỹ năng AI bóc tách được vào bảng ai_cv_skills
-            $aiSkillsSample = Skill::pluck('name')->random(rand(2, 4))->toArray();
-            foreach ($aiSkillsSample as $aiSkill) {
-                DB::table('ai_cv_skills')->insert([
-                    'ai_analysis_id' => $aiAnalysisId,
-                    'skill_name' => $aiSkill,
-                    'created_at' => Carbon::now(),
-                    'updated_at' => Carbon::now()
-                ]);
-            }
+            ]);            
         });
 
         // 7. TẠO TIN TUYỂN DỤNG (Ít nhất 20 tin tuyển dụng)
@@ -208,8 +187,7 @@ class DatabaseSeeder extends Seeder
 
             DB::table('applications')->insert([
                 'job_id' => $jobIds[array_rand($jobIds)],
-                'candidate_id' => $candId,
-                'cv_type' => fake()->randomElement(['online', 'pdf']),
+                'user_id' => $candidate->user_id,
                 'cv_file_id' => $cvFileId,
                 'description' => 'Tôi rất mong muốn được ứng tuyển vào vị trí này. Xin cảm ơn!',
                 'matching_score' => fake()->randomFloat(2, 50, 95),
@@ -229,26 +207,53 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
-        // 10. SEED BẢNG REPORTS
+        // 10. SEED BẢNG REPORTS (Đã cập nhật linh hoạt cho cả Job và Company)
+        $companyIds = Company::pluck('id')->toArray(); // Lấy thêm mảng ID công ty để fake dữ liệu
+
         $reportDescriptions = [
             'Tin tuyển dụng có dấu hiệu lừa đảo đóng tiền cọc trước khi nhận việc.',
             'Mô tả công việc không giống với thực tế khi đến phỏng vấn tại văn phòng.',
-            'Mức lương ghi trên bài đăng không đúng với thỏa thuận ban đầu.'
+            'Mức lương ghi trên bài đăng không đúng với thỏa thuận ban đầu.',
+            'Hồ sơ doanh nghiệp giả mạo, không có địa chỉ văn phòng thực tế.'
         ];
         $adminNotes = [
             'Đã khóa bài viết và cảnh cáo tài khoản nhà tuyển dụng.',
-            'Đã duyệt ẩn tin tuyển dụng lỗi này khỏi trang chủ.'
+            'Đã duyệt ẩn tin tuyển dụng lỗi này khỏi trang chủ.',
+            'Đã tạm thời ẩn thông tin doanh nghiệp chờ đối chiếu giấy phép.'
         ];
 
         for ($i = 0; $i < 20; $i++) {
+            // 🎲 Tỷ lệ 50/50: Quyết định dòng này báo cáo Job hay báo cáo Công ty trực tiếp
+            $isJobReport = fake()->boolean(50); 
+
+            $jobId = null;
+            $companyId = null;
+            $reasonType = 'other';
+
+            if ($isJobReport && !empty($jobIds)) {
+                // 📌 Fake dữ liệu báo cáo bài đăng tuyển dụng (Job)
+                $jobId = $jobIds[array_rand($jobIds)];
+                $reasonType = fake()->randomElement(['fraud', 'wrong_info', 'expired']);
+            } elseif (!empty($companyIds)) {
+                // 📌 Fake dữ liệu báo cáo trực tiếp doanh nghiệp (Company)
+                $companyId = $companyIds[array_rand($companyIds)];
+                $reasonType = fake()->randomElement(['fake_company', 'bad_behavior', 'other']);
+            }
+
             DB::table('reports')->insert([
-                'candidate_id' => $candidateIds[array_rand($candidateIds)],
-                'job_id' => $jobIds[array_rand($jobIds)],
-                'reason_type' => fake()->randomElement(['fraud', 'wrong_info', 'other']),
-                'description' => fake()->randomElement($reportDescriptions),
-                'status' => fake()->randomElement(['pending', 'resolved', 'rejected']),
-                'admin_note' => fake()->optional(0.7)->randomElement($adminNotes),
-                'created_at' => Carbon::now()->subDays(rand(10, 20))
+                // Giữ nguyên logic bốc ngẫu nhiên ID ứng viên đi báo cáo của bạn
+                'user_id' => $candidate->user_id, 
+                
+                // Cột nào không được chọn sẽ mang giá trị NULL chuẩn đét trong DB
+                'job_id'       => $jobId,
+                'company_id'   => $companyId,
+                
+                'reason_type'  => $reasonType,
+                'description'  => fake()->randomElement($reportDescriptions),
+                'status'       => fake()->randomElement(['pending', 'resolved', 'rejected']),
+                'admin_note'   => fake()->optional(0.7)->randomElement($adminNotes),
+                'created_at'   => Carbon::now()->subDays(rand(10, 20)),
+                'updated_at'   => Carbon::now()->subDays(rand(0, 9))
             ]);
         }
 

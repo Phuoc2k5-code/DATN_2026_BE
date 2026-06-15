@@ -13,9 +13,9 @@ return new class extends Migration
     {
         Schema::create('reports', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('candidate_id')->constrained('candidates')->onDelete('cascade');
-            $table->foreignId('job_id')->constrained('jobs')->onDelete('cascade');
-            $table->string('reason_type'); // Lừa đảo, từ ngữ xúc phạm, sai ngành nghề...
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+            $table->foreignId('job_id')->nullable()->constrained('jobs')->onDelete('cascade');
+            $table->foreignId('company_id')->nullable()->constrained('companies')->onDelete('cascade');            $table->string('reason_type'); // Lừa đảo, từ ngữ xúc phạm, sai ngành nghề...
             $table->text('description')->nullable();
             $table->string('status')->default('pending'); // pending, resolved, rejected
             $table->text('admin_note')->nullable(); // Ghi chú của Admin khi xử lý bài đăng tuyển dụng

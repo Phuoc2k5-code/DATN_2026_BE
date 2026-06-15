@@ -10,8 +10,9 @@ class Report extends Model
     protected $table = 'reports';
 
     protected $fillable = [
-        'candidate_id',
+        'user_id',
         'job_id',
+        'company_id',
         'reason_type',
         'description',
         'status',
@@ -26,13 +27,18 @@ class Report extends Model
         ];
     }
 
-    public function candidate(): BelongsTo
+    public function user(): BelongsTo
     {
-        return $this->belongsTo(Candidate::class, 'candidate_id', 'id');
+        return $this->belongsTo(User::class, 'user_id', 'id');
     }
 
     public function job(): BelongsTo
     {
         return $this->belongsTo(Job::class, 'job_id', 'id');
+    }
+
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class, 'company_id', 'id');
     }
 }

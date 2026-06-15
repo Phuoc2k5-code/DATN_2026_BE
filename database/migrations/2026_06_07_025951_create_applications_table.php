@@ -14,8 +14,7 @@ return new class extends Migration
         Schema::create('applications', function (Blueprint $table) {
             $table->id();
             $table->foreignId('job_id')->constrained('jobs')->onDelete('cascade');
-            $table->foreignId('candidate_id')->constrained('candidates')->onDelete('cascade');
-            $table->string('cv_type'); // 'online' (dùng mẫu cv hệ thống) hoặc 'uploaded' (file pdf tải lên)
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
             $table->foreignId('cv_file_id')->nullable()->constrained('cv_files')->onDelete('set null');
             $table->text('description')->nullable();
             $table->decimal('matching_score', 5, 2)->default(0.00); // Ví dụ: 85.50 %

@@ -64,11 +64,6 @@ class Candidate extends Model
         return $this->belongsToMany(Skill::class, 'candidate_skill', 'candidate_id', 'skill_id');
     }
 
-    public function applications(): HasMany
-    {
-        return $this->hasMany(Application::class, 'candidate_id', 'id');
-    }
-
     public function savedJobs(): BelongsToMany
     {
         return $this->belongsToMany(Job::class, 'wishlists', 'candidate_id', 'job_id')->withTimestamps();

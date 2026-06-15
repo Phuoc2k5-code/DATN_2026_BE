@@ -5,10 +5,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\Candidate\WishlistController;
 use App\Http\Controllers\Candidate\AppliedJobController;
 use App\Http\Controllers\Candidate\CandidateController;
 use App\Http\Controllers\Candidate\CVFileController;
+use App\Http\Controllers\Candidate\AIController;
 
 
 Route::post('/login-user', [LoginController::class, 'LoginUser']);
@@ -17,6 +19,8 @@ Route::post('/login-admin', [LoginController::class, 'LoginAdmin']);
 Route::get('/home', [HomeController::class, 'index']);
 Route::get('/job-detail/{id}', [HomeController::class, 'JobDetail']);
 Route::get('/companies/{id}', [HomeController::class, 'getCompanyDetail']);
+Route::get('categories', [HomeController::class, 'getCategories']);
+
 Route::middleware('auth:sanctum')->group(function(){
     Route::get('/user-profile', [UserController::class, 'userProfile']);
     Route::post('/user-profile/update', [UserController::class, 'updateProfile']);
@@ -29,11 +33,15 @@ Route::middleware('auth:sanctum')->group(function(){
     Route::get('get-category', [CandidateController::class, 'getFormData']);
     Route::delete('/delete-candidate', [CandidateController::class, 'deleteCandidate']);
     Route::get('/cv-management', [CandidateController::class, 'index']);
-    Route::get('/cv-management/getDataCV', [CandidateController::class, 'getDataCV']);
+    Route::get('/cv-management/preview-cv', [CandidateController::class, 'previewCV']);
     Route::post('/cv-management/updateCvTemplate/{id}', [CandidateController::class, 'updateCVTemplate']);
     Route::post('/cv-management/upload-cv', [CVFileController::class, 'uploadCV']);
     Route::delete('/cv-management/destroy-file', [CVFileController::class, 'destroyFile']);
     Route::get('/cv-management/download-cv', [CVFileController::class, 'downloadAndSaveCV']);
     Route::get('/cv-management/download-cv/{id}', [CVFileController::class, 'downloadAndSaveCV']);
-
+    Route::get('/quick-applyInit', [AppliedJobController::class, 'quickApplyInit']);
+    Route::post('/quick-apply', [AppliedJobController::class, 'quickApply']);
+    Route::get('/user-cv-list', [AIController::class, 'getUserCvList']);
+    Route::get('/ai-recomment', [AIController::class, 'getRecommendations']);
+    Route::post('/reports', [ReportController::class, 'store']);
 });
