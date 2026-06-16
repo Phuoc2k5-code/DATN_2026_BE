@@ -11,19 +11,40 @@ class UserController extends Controller
     /**
      * Lấy danh sách user có role khác admin
      */
-    public function getUsersExceptAdmin()
-    {
-        // 1. Lấy danh sách user với điều kiện role khác 'admin'
-        // Dùng dấu '<>' hoặc '!=' đều được bạn nhé
-        $users = User::withTrashed()->where('role', '!=', 'admin')->get();
+    public function getUsersExceptAdmin(Request $request)
+{
+    // 1. Khởi tạo query tìm kiếm ngoại trừ admin
+    $query = User::withTrashed()->where('role', '!=', 'admin');
 
-        // 2. Trả về dữ liệu dạng JSON kèm status code 200 (OK)
-        return response()->json([
-            'success' => true,
-            'message' => 'Lấy danh sách thành công.',
-            'data'    => $users
-        ], 200);
+    // 2. Tìm kiếm toàn bộ hệ thống theo tên hoặc email (nếu có truyền lên)
+    if ($request->has('search') && !empty($request->input('search'))) {
+        $search = $request->input('search');
+        $query->where(function($q) use ($search) {
+            $q->where('email', 'like', "%{$search}%");
+        });
     }
+
+    // 3. Lọc theo Vai trò (nếu có truyền lên và khác 'all')
+    if ($request->has('role') && $request->input('role') !== 'all') {
+        $query->where('role', $request->input('role'));
+    }
+
+    // 4. Phân trang kết quả sau khi đã lọc (Mỗi trang 10 user)
+    $users = $query->latest()->paginate(10);
+
+    // 5. Trả về kèm thông tin phân trang chuẩn
+    return response()->json([
+        'success' => true,
+        'message' => 'Lấy danh sách thành công.',
+        'data'    => $users->items(),
+        'pagination' => [
+            'current_page' => $users->currentPage(),
+            'last_page'    => $users->lastPage(),
+            'total'        => $users->total(),
+            'per_page'     => $users->perPage(),
+        ]
+    ], 200);
+}
 
     public function lockUser($id)
     {

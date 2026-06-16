@@ -14,6 +14,7 @@ use App\Http\Controllers\Candidate\AIController;
 use App\Http\Controllers\Employer\CompanyController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\CvTemplateController;
+use App\Http\Controllers\Admin\AdminController;
 
 Route::post('/login-user', [LoginController::class, 'LoginUser']);
 Route::post('/login-admin', [LoginController::class, 'LoginAdmin']);
@@ -22,6 +23,7 @@ Route::get('/home', [HomeController::class, 'index']);
 Route::get('/job-detail/{id}', [HomeController::class, 'JobDetail']);
 Route::get('/companies/{id}', [HomeController::class, 'getCompanyDetail']);
 Route::get('categories', [HomeController::class, 'getCategories']);
+Route::post('/jobs/{id}/click', [HomeController::class, 'trackClick']);
 
 Route::middleware('auth:sanctum')->group(function(){
     Route::get('/user-profile', [UserController::class, 'userProfile']);
@@ -63,5 +65,5 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::post('/create-cv-template', [CvTemplateController::class, 'store']);
     Route::put('/update-cv-templates/{id}', [CvTemplateController::class, 'update']);
     Route::delete('/delete-cv-templates/{id}', [CvTemplateController::class, 'destroy']);
-
+    Route::get('/dashboard-stats', [AdminController::class, 'getDashboardStats']);
 });

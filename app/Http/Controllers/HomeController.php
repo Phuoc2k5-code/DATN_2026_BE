@@ -7,100 +7,102 @@ use App\Models\Job;
 use App\Models\Company;
 use App\Models\Application;
 use App\Models\Category;
+use App\Models\JobClick;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 
 class HomeController extends Controller
 {
   public function index(Request $request)
-{
-  try {
-    $userId = null;
+  {
+    try {
+      $userId = null;
 
-    // 🔥 Tự check token ngầm để lấy User ẩn danh hoặc đã đăng nhập
-    $user = auth('sanctum')->user();
-    if ($user) {
-      $userId = $user->id;
-    }
+      // 🔥 Tự check token ngầm để lấy User ẩn danh hoặc đã đăng nhập
+      $user = auth('sanctum')->user();
+      if ($user) {
+        $userId = $user->id;
+      }
 
-    $savedJobIds = [];
-    if ($userId) {
-      $savedJobIds = \DB::table('wishlists')
-        ->where('user_id', $userId)
-        ->pluck('job_id')
-        ->toArray();
-    }
+      $savedJobIds = [];
+      if ($userId) {
+        $savedJobIds = \DB::table('wishlists')
+          ->where('user_id', $userId)
+          ->pluck('job_id')
+          ->toArray();
+      }
 
-    // 1. Khởi tạo Query ban đầu
-    $query = Job::with(['company', 'category', 'skills'])
-      ->where('status', 'active');
+      // 1. Khởi tạo Query ban đầu
+      $query = Job::with(['company', 'category', 'skills'])
+        ->where('status', 'active');
 
-    // 2. 🔥 BỘ LỌC TÌM KIẾM THEO ĐIỀU KIỆN TỪ FRONTEND GỬI LÊN
+      // 2. 🔥 BỘ LỌC TÌM KIẾM THEO ĐIỀU KIỆN TỪ FRONTEND GỬI LÊN
 
-    // Lọc theo từ khóa (Keyword): Tìm theo tiêu đề job hoặc tên công ty
-    if ($request->has('keyword') && !empty($request->keyword)) {
-      $keyword = $request->keyword;
-      $query->where(function ($q) use ($keyword) {
-        $q->where('title', 'like', '%' . $keyword . '%')
-          ->orWhereHas('company', function ($companyQuery) use ($keyword) {
+      // Lọc theo từ khóa (Keyword): Tìm theo tiêu đề job hoặc tên công ty
+      if ($request->has('keyword') && !empty($request->keyword)) {
+        $keyword = $request->keyword;
+        $query->where(function ($q) use ($keyword) {
+          $q->where('title', 'like', '%' . $keyword . '%')
+            ->orWhereHas('company', function ($companyQuery) use ($keyword) {
               $companyQuery->where('company_name', 'like', '%' . $keyword . '%');
-          });
+            });
+        });
+      }
+
+      // Lọc theo Địa điểm (Location)
+      if ($request->has('location') && !empty($request->location)) {
+        $query->where('location', 'like', '%' . $request->location . '%');
+      }
+
+      // Lọc theo Ngành nghề (Category ID)
+      if ($request->has('category_id') && !empty($request->category_id)) {
+        // Nếu cột category_id trong bảng jobs là ID (số), hãy đảm bảo Frontend truyền lên ID.
+        // Còn nếu đang lưu thẳng chuỗi tên ngành nghề, điều kiện dưới đây vẫn đúng:
+        $query->where('category_id', $request->category_id);
+      }
+
+      // Lọc theo Cấp bậc (Level) - Frontend mặc định gửi "Nổi bật" nếu không chọn
+      if ($request->has('level') && !empty($request->level) && $request->level !== 'Nổi bật') {
+        $query->where('level', $request->level);
+      }
+
+      // Lọc theo khoảng Lương (Salary)
+      if ($request->has('salary_from') && !empty($request->salary_from)) {
+        $query->where('salary', '>=', $request->salary_from); // Thay 'salary' bằng tên cột tương ứng
+      }
+      if ($request->has('salary_to') && !empty($request->salary_to)) {
+        $query->where('salary', '<=', $request->salary_to);
+      }
+
+      // --- ĐOẠN DƯỚI GIỮ NGUYÊN HOÀN TOÀN ---
+      // Sắp xếp theo tin đăng mới nhất và thực hiện phân trang
+      $jobs = $query->latest('id')->paginate(9);
+
+      $jobs->getCollection()->transform(function ($job) use ($savedJobIds) {
+        $job->is_saved = in_array($job->id, $savedJobIds);
+        return $job;
       });
+
+      return response()->json([
+        'success' => true,
+        'message' => 'Lấy danh sách tin tuyển dụng thành công.',
+        'data' => $jobs->items(),
+        'pagination' => [
+          'current_page' => $jobs->currentPage(),
+          'last_page' => $jobs->lastPage(),
+          'per_page' => $jobs->perPage(),
+          'total' => $jobs->total(),
+        ],
+      ], 200);
+
+    } catch (\Exception $e) {
+      return response()->json([
+        'success' => false,
+        'message' => 'Đã xảy ra lỗi khi tải danh sách tin tuyển dụng.',
+        'error' => $e->getMessage()
+      ], 500);
     }
-
-    // Lọc theo Địa điểm (Location)
-    if ($request->has('location') && !empty($request->location)) {
-      $query->where('location', 'like', '%' . $request->location . '%');
-    }
-
-    // Lọc theo Ngành nghề (Category ID)
-    if ($request->has('category_id') && !empty($request->category_id)) {
-      // Nếu cột category_id trong bảng jobs là ID (số), hãy đảm bảo Frontend truyền lên ID.
-      // Còn nếu đang lưu thẳng chuỗi tên ngành nghề, điều kiện dưới đây vẫn đúng:
-      $query->where('category_id', $request->category_id);
-    }
-
-    // Lọc theo Cấp bậc (Level) - Frontend mặc định gửi "Nổi bật" nếu không chọn
-    if ($request->has('level') && !empty($request->level) && $request->level !== 'Nổi bật') {
-      $query->where('level', $request->level);
-    }
-
-    // Lọc theo khoảng Lương (Salary)
-    if ($request->has('salary_from') && !empty($request->salary_from)) {
-      $query->where('salary', '>=', $request->salary_from); // Thay 'salary' bằng tên cột tương ứng
-    }
-    if ($request->has('salary_to') && !empty($request->salary_to)) {
-      $query->where('salary', '<=', $request->salary_to);
-    }
-
-    // --- ĐOẠN DƯỚI GIỮ NGUYÊN HOÀN TOÀN ---
-    // Sắp xếp theo tin đăng mới nhất và thực hiện phân trang
-    $jobs = $query->latest('id')->paginate(9);
-
-    $jobs->getCollection()->transform(function ($job) use ($savedJobIds) {
-      $job->is_saved = in_array($job->id, $savedJobIds);
-      return $job;
-    });
-
-    return response()->json([
-      'success' => true,
-      'message' => 'Lấy danh sách tin tuyển dụng thành công.',
-      'data' => $jobs->items(),
-      'pagination' => [
-        'current_page' => $jobs->currentPage(),
-        'last_page' => $jobs->lastPage(),
-        'per_page' => $jobs->perPage(),
-        'total' => $jobs->total(),
-      ],
-    ], 200);
-
-  } catch (\Exception $e) {
-    return response()->json([
-      'success' => false,
-      'message' => 'Đã xảy ra lỗi khi tải danh sách tin tuyển dụng.',
-      'error' => $e->getMessage()
-    ], 500);
   }
-}
 
   public function JobDetail($id)
   {
@@ -119,9 +121,9 @@ class HomeController extends Controller
     // Kiểm tra xem User đăng nhập đã ứng tuyển chưa
     $applicationStatus = false;
     if (Auth::guard('sanctum')->check()) {
-        $applicationStatus = Application::where('job_id', $id)
-            ->where('user_id', Auth::guard('sanctum')->id())
-            ->value('status');
+      $applicationStatus = Application::where('job_id', $id)
+        ->where('user_id', Auth::guard('sanctum')->id())
+        ->value('status');
     }
 
     // 3. Trả về dữ liệu công việc thành công
@@ -171,22 +173,53 @@ class HomeController extends Controller
   }
 
   public function getCategories()
-{
+  {
     try {
-        // Lấy ra id và name của tất cả ngành nghề
-        $categories = Category::select('id', 'name')->get();
+      // Lấy ra id và name của tất cả ngành nghề
+      $categories = Category::select('id', 'name')->get();
 
-        return response()->json([
-            'success' => true,
-            'data' => $categories
-        ], 200);
+      return response()->json([
+        'success' => true,
+        'data' => $categories
+      ], 200);
 
     } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Không thể lấy danh sách ngành nghề.',
-            'error' => $e->getMessage()
-        ], 500);
+      return response()->json([
+        'success' => false,
+        'message' => 'Không thể lấy danh sách ngành nghề.',
+        'error' => $e->getMessage()
+      ], 500);
     }
-}
+  }
+
+  public function trackClick($id)
+  {
+    // 1. Kiểm tra tin tuyển dụng
+    $jobExists = Job::where('id', $id)->exists();
+    if (!$jobExists) {
+      return response()->json(['success' => false, 'message' => 'Tin không tồn tại.'], 404);
+    }
+
+    $today = Carbon::today()->toDateString();
+
+    // 2. Tìm xem ngày hôm nay tin này đã được click chưa
+    $query = JobClick::where('job_id', $id)->where('click_date', $today);
+
+    if ($query->exists()) {
+      // NẾU ĐÃ CÓ: Bắn thẳng lệnh UPDATE xuống DB +1, không thông qua Object save() nữa
+      $query->increment('click_count');
+    } else {
+      // NẾU CHƯA CÓ: Tạo mới bản ghi, DB tự nạp giá trị mặc định là 1
+      JobClick::create([
+        'job_id' => $id,
+        'click_date' => $today
+      ]);
+    }
+
+    return response()->json([
+      'success' => true,
+      'message' => 'Ghi nhận lượt click thành công.'
+    ], 200);
+  }
+
 }

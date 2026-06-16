@@ -126,43 +126,51 @@ class ReportController extends Controller
   }
 
   public function getViolationReports(Request $request)
-  {
+{
     // Kéo kèm thông tin User gửi, Job bị báo cáo, Company bị báo cáo
     $query = Report::with([
-      'user' => function ($q) {
-        $q->withTrashed();
-      },
-      // Nạp Job kèm theo đếm tổng số report của chính Job đó
-      'job' => function ($q) {
-        $q->select('id', 'title')->withCount('reports');
-      },
-      // Nạp Company kèm theo đếm tổng số report của chính Company đó
-      'company' => function ($q) {
-        $q->select('id', 'company_name', 'logo_url')->withCount('reports');
-      }
+        'user' => function ($q) {
+            $q->withTrashed();
+        },
+        // Nạp Job kèm theo đếm tổng số report của chính Job đó
+        'job' => function ($q) {
+            $q->select('id', 'title')->withCount('reports');
+        },
+        // Nạp Company kèm theo đếm tổng số report của chính Company đó
+        'company' => function ($q) {
+            $q->select('id', 'company_name', 'logo_url')->withCount('reports');
+        }
     ])->latest();
+
     // Thêm bộ lọc trạng thái nếu phía React cần lọc (pending, resolved...)
     if ($request->has('status') && $request->status != 'all') {
-      $query->where('status', $request->status);
+        $query->where('status', $request->status);
     }
 
     // Thêm bộ lọc loại báo cáo (Lọc xem báo cáo Job hay báo cáo Company)
-    if ($request->has('type')) {
-      if ($request->type === 'job') {
-        $query->whereNotNull('job_id');
-      } elseif ($request->type === 'company') {
-        $query->whereNotNull('company_id');
-      }
+    if ($request->has('type') && $request->type != 'all') {
+        if ($request->type === 'job') {
+            $query->whereNotNull('job_id');
+        } elseif ($request->type === 'company') {
+            $query->whereNotNull('company_id');
+        }
     }
 
-    $reports = $query->get();
+    // Phân trang tự động bắt tham số ?page từ React gửi lên (Mỗi trang 10 dòng)
+    $reports = $query->paginate(10);
 
     return response()->json([
-      'success' => true,
-      'message' => 'Lấy danh sách báo cáo thành công.',
-      'data' => $reports
+        'success'   => true,
+        'message'   => 'Lấy danh sách báo cáo thành công.',
+        'data'      => $reports->items(), // Trả về danh sách của trang hiện tại
+        'pagination' => [
+            'current_page' => $reports->currentPage(),
+            'last_page'    => $reports->lastPage(),
+            'total'        => $reports->total(),
+            'per_page'     => $reports->perPage(),
+        ]
     ], 200);
-  }
+}
 
   /**
    * API: Xem chi tiết một bản ghi báo cáo vi phạm
