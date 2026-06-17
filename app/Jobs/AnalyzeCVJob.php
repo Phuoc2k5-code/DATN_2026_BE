@@ -24,6 +24,7 @@ class AnalyzeCVJob implements ShouldQueue
         $this->applicationId = $applicationId;
     }
 
+    // hàm  chạy ngầm việc chấm điểm cv của chức năng ứng tuyển 
     public function handle()
     {
         Log::info("====================================================");

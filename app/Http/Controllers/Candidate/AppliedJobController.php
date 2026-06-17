@@ -28,11 +28,11 @@ class AppliedJobController extends Controller
       ], 404);
     }
 
-    // 2. Lấy lịch sử ứng tuyển: lôi luôn Job, Company và file CV đã nộp ra cùng lúc
+    // 2. Lấy lịch sử ứng tuyển
     $applications = $user->applications()
       ->with([
-        'job.company', // Lấy dây chuyền: Đơn -> Thuộc về Job -> Thuộc về Company
-        'cvFile'       // 🚀 LẤY THÊM: Thông tin file CV từ bảng cv_files (cv_file_id)
+        'job.company', 
+        'cvFile'       
       ])
       ->orderBy('applied_at', 'desc')
       ->get();
@@ -44,7 +44,9 @@ class AppliedJobController extends Controller
     ]);
   }
 
-  // hàm dùng để xuất danh sách khi bấm nút ứng tuyển 
+  /* api này chạy khi người dùng bấm nút ứng tuyển
+    1. xuất danh sách cv của người dùng, 
+    2. xuất  cv online nếu người dùng chưa tải hoặc hệ thống chưa có file cv này */
   public function quickApplyInit(Request $request)
   {
     $user = Auth::user();
@@ -64,7 +66,6 @@ class AppliedJobController extends Controller
         ->latest('id')
         ->first();
 
-      // 🎯 FIX LỖI 1: Nếu CHƯA CÓ file online HOẶC hồ sơ có CẬP NHẬT MỚI (Khác mốc updated_at) thì RENDER
       if (!$latestCvFile || $candidate->updated_at != $latestCvFile->updated_at) {
 
         // 2. CƠ CHẾ ĐỊNH TUYẾN TEMPLATE BLADE
@@ -81,7 +82,7 @@ class AppliedJobController extends Controller
         }
 
         try {
-          // --- 🚀 TÍNH TOÁN ĐƯỜNG DẪN ẢNH VẬT LÝ TUYỆT ĐỐI ---
+          // --- TÍNH TOÁN ĐƯỜNG DẪN ẢNH VẬT LÝ TUYỆT ĐỐI ---
           $avatarPdfPath = null;
           $imagePath = '';
 
@@ -95,7 +96,7 @@ class AppliedJobController extends Controller
           }
           $candidate->avatar_pdf_path = $avatarPdfPath;
 
-          // --- 🚀 XỬ LÝ BIẾN LASTNAME ĐỂ TRÁNH LỖI TRONG BLADE ---
+          // --- XỬ LÝ BIẾN LASTNAME ĐỂ TRÁNH LỖI TRONG BLADE ---
           $nameParts = explode(' ', trim($candidate->full_name));
           $lastName = end($nameParts);
 
@@ -114,7 +115,7 @@ class AppliedJobController extends Controller
           $publicFolder = public_path('cv_files');
 
           if (!file_exists($publicFolder)) {
-            mkdir($publicFolder, 0755, true);
+            mkdir($publicFolder, 0755, true); //  xuất cv bản pdf
           }
 
           $fullPath = $publicFolder . '/' . $fileName;
@@ -155,8 +156,7 @@ class AppliedJobController extends Controller
           ], 500);
         }
 
-      } else {
-        // 🎯 FIX LỖI 2: Trường hợp hồ sơ không đổi, lấy file cũ của chính USER này
+      } else { // Cv online ko có cập nhật j mới  
         $data1 = CvFile::where('user_id', $user->id)->where('type', 'online')->latest('id')->first();
         $data2 = CvFile::where('user_id', $user->id)->where('type', 'uploaded')->latest('id')->get();
 
@@ -169,8 +169,7 @@ class AppliedJobController extends Controller
           ]
         ]);
       }
-    } else {
-      // 🎯 FIX LỖI 2: Trường hợp hồ sơ không đổi, lấy file cũ của chính USER này
+    } else { // ko có  cv online 
       $data1 = CvFile::where('user_id', $user->id)->where('type', 'online')->latest('id')->first();
       $data2 = CvFile::where('user_id', $user->id)->where('type', 'uploaded')->latest('id')->get();
 

@@ -128,7 +128,7 @@ class CandidateController extends Controller
       return response()->json(['success' => false, 'message' => 'Chưa đăng nhập.'], 401);
     }
 
-    // 🚀 GIẢI NÉN MẢNG: Chuyển chuỗi JSON từ Frontend gửi lên thành Array để vượt vòng gửi xe Validation
+    // GIẢI NÉN MẢNG: Chuyển chuỗi JSON từ Frontend gửi lên thành Array để vượt vòng gửi xe Validation
     if ($request->has('skills') && !is_array($request->skills)) {
       $request->merge(['skills' => json_decode($request->skills, true)]);
     }
@@ -175,11 +175,11 @@ class CandidateController extends Controller
     try {
       $validatedData = $validator->validated();
 
-      // 🚀 BƯỚC CHÍ MẠNG 1: Tách mảng skills ra riêng, không để nó chạy bậy vào câu lệnh sql create/update
+      // BƯỚC 1: Tách mảng skills ra riêng, không để nó chạy bậy vào câu lệnh sql create/update
       $skillsData = $validatedData['skills'];
       unset($validatedData['skills']);
 
-      // 🚀 BƯỚC CHÍ MẠNG 2: Mã hóa các trường dữ liệu dạng mảng thành string JSON để lưu vào cột TEXT/JSON trong DB
+      // BƯỚC 2: Mã hóa các trường dữ liệu dạng mảng thành string JSON để lưu vào cột TEXT/JSON trong DB
       if (isset($validatedData['links'])) {
         $validatedData['links'] = json_encode($validatedData['links']);
       }
@@ -263,7 +263,6 @@ class CandidateController extends Controller
 
       $currentAvatar = $candidate->avatar_url;
 
-      // 🚀 SỬA TẠI ĐÂY: Dùng json_encode để tránh lỗi 500 ép kiểu Array thành String
       $candidate->update([
         'title' => '',
         'summary' => null,
