@@ -27,6 +27,7 @@ class Job extends Model
         'benefits',
         'expired_at',
         'status',
+        'reject_reason'
     ];
 
     protected function casts(): array

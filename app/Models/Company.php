@@ -25,6 +25,7 @@ class Company extends Model
         'address', 
         'benefits',
         'is_verified',
+        'reject_reason'
     ];
 
     protected function casts(): array
