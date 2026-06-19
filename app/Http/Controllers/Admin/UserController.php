@@ -11,46 +11,43 @@ class UserController extends Controller
     /**
      * Lấy danh sách user có role khác admin
      */
-    public function getUsersExceptAdmin(Request $request)
-{
-    // 1. Khởi tạo query tìm kiếm ngoại trừ admin
-    $query = User::withTrashed()->where('role', '!=', 'admin');
+    public function getUsersExceptAdmin(Request $request){
+        $query = User::withTrashed()->where('role', '!=', 'admin');
 
-    // 2. Tìm kiếm toàn bộ hệ thống theo tên hoặc email (nếu có truyền lên)
-    if ($request->has('search') && !empty($request->input('search'))) {
-        $search = $request->input('search');
-        $query->where(function($q) use ($search) {
-            $q->where('email', 'like', "%{$search}%");
-        });
+        // 2. Tìm kiếm toàn bộ hệ thống theo tên hoặc email (nếu có truyền lên)
+        if ($request->has('search') && !empty($request->input('search'))) {
+            $search = $request->input('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('email', 'like', "%{$search}%");
+            });
+        }
+
+        // 3. Lọc theo Vai trò (nếu có truyền lên và khác 'all')
+        if ($request->has('role') && $request->input('role') !== 'all') {
+            $query->where('role', $request->input('role'));
+        }
+
+        // 4. Phân trang kết quả sau khi đã lọc (Mỗi trang 10 user)
+        $users = $query->latest()->paginate(10);
+
+        // 5. Trả về kèm thông tin phân trang chuẩn
+        return response()->json([
+            'success' => true,
+            'message' => 'Lấy danh sách thành công.',
+            'data' => $users->items(),
+            'pagination' => [
+                'current_page' => $users->currentPage(),
+                'last_page' => $users->lastPage(),
+                'total' => $users->total(),
+                'per_page' => $users->perPage(),
+            ]
+        ], 200);
     }
-
-    // 3. Lọc theo Vai trò (nếu có truyền lên và khác 'all')
-    if ($request->has('role') && $request->input('role') !== 'all') {
-        $query->where('role', $request->input('role'));
-    }
-
-    // 4. Phân trang kết quả sau khi đã lọc (Mỗi trang 10 user)
-    $users = $query->latest()->paginate(10);
-
-    // 5. Trả về kèm thông tin phân trang chuẩn
-    return response()->json([
-        'success' => true,
-        'message' => 'Lấy danh sách thành công.',
-        'data'    => $users->items(),
-        'pagination' => [
-            'current_page' => $users->currentPage(),
-            'last_page'    => $users->lastPage(),
-            'total'        => $users->total(),
-            'per_page'     => $users->perPage(),
-        ]
-    ], 200);
-}
-
+    // hàm Khóa tài khoản
     public function lockUser($id)
     {
         $user = User::findOrFail($id);
 
-        // Hàm delete() lúc này sẽ không xóa hẳn trong DB mà chỉ nạp data vào cột deleted_at
         $user->delete();
 
         return response()->json([
@@ -58,16 +55,11 @@ class UserController extends Controller
             'message' => "Đã khóa tài khoản của user {$user->name} thành công."
         ], 200);
     }
-
-    /**
-     * API Mở khóa tài khoản (Restore)
-     */
+    // Hàm Mở khóa tài khoản (Restore)
     public function unlockUser($id)
     {
-        // Vì tài khoản đã bị khóa (soft deleted), ta phải dùng 'withTrashed' mới tìm ra được
         $user = User::withTrashed()->findOrFail($id);
 
-        // Khôi phục lại tài khoản (đưa cột deleted_at về lại null)
         $user->restore();
 
         return response()->json([

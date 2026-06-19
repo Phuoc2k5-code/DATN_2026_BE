@@ -207,18 +207,14 @@ class ReportController extends Controller
     ], 200);
   }
 
-  public function resolveReport(Request $request, $id)
-  {
-    // 1. Tìm bản ghi báo cáo
+  public function resolveReport(Request $request, $id){
     $report = Report::find($id);
-
     if (!$report) {
       return response()->json([
         'success' => false,
         'message' => 'Không tìm thấy dữ liệu báo cáo này.'
       ], 404);
     }
-
     // Nếu báo cáo đã xử lý từ trước rồi thì chặn lại không cho bấm nữa
     if ($report->status !== 'pending') {
       return response()->json([
@@ -226,11 +222,9 @@ class ReportController extends Controller
         'message' => 'Báo cáo này đã được xử lý hoặc bác bỏ từ trước.'
       ], 400);
     }
-
     // Nhận lý do kỷ luật từ phía React gửi lên (nếu không nhập thì lấy lý do mặc định)
     $adminNote = $request->input('admin_note', 'Vi phạm tiêu chuẩn đăng tin tuyển dụng.');
-
-    // 2. BIỆN PHÁP 1: NẾU LÀ BÁO CÁO TIN TUYỂN DỤNG (JOB)
+    // NẾU LÀ BÁO CÁO TIN TUYỂN DỤNG (JOB)
     if ($report->job_id) {
       $job = Job::find($report->job_id);
       if ($job) {
@@ -240,8 +234,7 @@ class ReportController extends Controller
         ]);
       }
     }
-
-    // 3. BIỆN PHÁP 2: NẾU LÀ BÁO CÁO DOANH NGHIỆP (COMPANY)
+    // NẾU LÀ BÁO CÁO DOANH NGHIỆP (COMPANY)
     if ($report->company_id) {
       $company = Company::find($report->company_id);
       if ($company) {
@@ -249,7 +242,6 @@ class ReportController extends Controller
         $company->update([
           'status' => 'suspended'
         ]);
-
         // Bước B: Tìm tài khoản User (Nhà tuyển dụng) sở hữu công ty này và KHÓA LUÔN
         // (Giả sử bảng companies của bạn có cột user_id liên kết sang bảng users)
         $employer = User::find($company->user_id);
@@ -258,7 +250,6 @@ class ReportController extends Controller
         }
       }
     }
-
     // 4. Cập nhật trạng thái bản ghi Report sang ĐÃ XỬ LÝ
     $report->update([
       'status' => 'resolved',
@@ -278,7 +269,6 @@ class ReportController extends Controller
    */
   public function dismissReport(Request $request, $id)
   {
-    // 1. Tìm bản ghi báo cáo
     $report = Report::find($id);
 
     if (!$report) {

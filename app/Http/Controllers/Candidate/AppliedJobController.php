@@ -115,11 +115,11 @@ class AppliedJobController extends Controller
           $publicFolder = public_path('cv_files');
 
           if (!file_exists($publicFolder)) {
-            mkdir($publicFolder, 0755, true); //  xuất cv bản pdf
+            mkdir($publicFolder, 0755, true);
           }
 
           $fullPath = $publicFolder . '/' . $fileName;
-          file_put_contents($fullPath, $pdfContent);
+          file_put_contents($fullPath, $pdfContent); 
 
           $fileSize = filesize($fullPath);
           $dbFilePath = '/cv_files/' . $fileName;

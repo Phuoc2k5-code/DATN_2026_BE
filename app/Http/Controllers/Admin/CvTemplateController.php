@@ -8,10 +8,9 @@ use App\Models\CvTemplate;
 use Illuminate\Support\Facades\Validator;
 class CvTemplateController extends Controller
 {
-    public function index()
-    {
+    public function index(){
         try {
-            // Lấy tất cả mẫu CV, sắp xếp theo ID tăng dần (hoặc mẫu mới lên trước tùy bạn)
+            // Lấy tất cả mẫu CV, sắp xếp theo ID tăng dần
             $templates = CvTemplate::withCount('candidates')
                 ->orderBy('id', 'asc')
                 ->get();
@@ -58,8 +57,7 @@ class CvTemplateController extends Controller
         ], 201);
     }
 
-    public function update(Request $request, $id)
-    {
+    public function update(Request $request, $id){
         $template = CvTemplate::find($id);
         
         if (!$template) {

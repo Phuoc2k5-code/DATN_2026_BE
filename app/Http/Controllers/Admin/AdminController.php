@@ -18,15 +18,15 @@ class AdminController extends Controller
     {
         // 1. LẤY SỐ LIỆU CHO 4 TOP CARDS
         $totalUsers = User::count();
-        
+
         // Tin tuyển dụng mới trong tháng hiện tại
         $newJobsThisMonth = Job::whereMonth('created_at', Carbon::now()->month)
-                               ->whereYear('created_at', Carbon::now()->year)
-                               ->count();
-                               
+            ->whereYear('created_at', Carbon::now()->year)
+            ->count();
+
         // Tin tuyển dụng đang trong trạng thái chờ duyệt
         $pendingJobsCount = Job::where('status', 'pending')->count();
-        
+
         // Báo cáo vi phạm đang ở trạng thái chờ xử lý (pending)
         $pendingReportsCount = Report::where('status', 'pending')->count();
 
@@ -38,7 +38,7 @@ class AdminController extends Controller
             ->latest('id')
             ->take(7)
             ->get()
-            ->map(function($job) {
+            ->map(function ($job) {
                 return [
                     'id' => $job->id,
                     'company_name' => $job->company->company_name ?? 'N/A',
@@ -48,8 +48,6 @@ class AdminController extends Controller
                 ];
             });
 
-
-            
         // 3. XỬ LÝ DỮ LIỆU BIỂU ĐỒ CỘT/ĐƯỜNG (ỨNG TUYỂN TRONG 7 NGÀY QUA)
         $chartLineBar = [];
         for ($i = 6; $i >= 0; $i--) {
@@ -58,12 +56,12 @@ class AdminController extends Controller
             $labelString = $date->format('d/m'); // Định dạng hiển thị ví dụ: "16/06"
 
             // Đếm số lượt nộp đơn ứng tuyển (Applications) trong ngày này
-            $applyCount = Application::whereDate('created_at', $dateString)->count();
+            $applyCount = Application::whereDate('applied_at', $dateString)->count();
 
             // Giả lập thêm số lượt truy cập (Views) nếu bạn chưa có bảng click_tracks, 
             // Hoặc bạn có thể đếm từ một bảng log khác. Ở đây mình tính tỉ lệ tạm thời:
             $viewCount = JobClick::where('click_date', $dateString)
-                                     ->sum('click_count');
+                ->sum('click_count');
 
             $chartLineBar[] = [
                 'name' => $labelString,
@@ -71,8 +69,6 @@ class AdminController extends Controller
                 'Lượt truy cập' => $viewCount
             ];
         }
-
-
 
         // 4. XỬ LÝ DỮ LIỆU BIỂU ĐỒ TRÒN (TỶ LỆ TRẠNG THÁI TIN ĐĂNG)
         // Lấy danh sách số lượng phân nhóm theo cột status trong DB
@@ -94,7 +90,7 @@ class AdminController extends Controller
         foreach ($statusLabels as $statusKey => $config) {
             $count = $jobStatusStats[$statusKey] ?? 0;
             // Chỉ đẩy vào biểu đồ tròn nếu trạng thái đó có tin bài (tránh bị trống map)
-            if ($count >= 0) { 
+            if ($count >= 0) {
                 $chartDoughnut[] = [
                     'name' => $config['label'],
                     'value' => $count,
@@ -102,7 +98,6 @@ class AdminController extends Controller
                 ];
             }
         }
-
 
         // 5. TRẢ VỀ JSON TỔNG HỢP
         return response()->json([

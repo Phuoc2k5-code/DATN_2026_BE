@@ -361,7 +361,7 @@
 				@if($candidate->objective)
 					<div class="main-section-title" style="margin-top: 0;">Mục tiêu nghề nghiệp</div>
 					<div
-						style="font-size: 13px; color: #334155; padding-left: 15px; border-left: 2px solid #3b82f6; margin-left: 5px; text-align: left; line-height: 0.5;"
+						style="font-size: 13px; color: #334155; padding-left: 15px; border-left: 2px solid #3b82f6; margin-left: 5px; text-align: left; line-height: 1.5;"
 						class="whitespace-pre-line break-words">
 						{{ $candidate->objective }}
 					</div>
@@ -408,7 +408,7 @@
 				<!-- HỌC VẤN & BẰNG CẤP -->
 				<div class="main-section-title">Học vấn & Bằng cấp</div>
 				<div
-					style="font-size: 13px; color: #334155; padding-left: 15px; border-left: 2px solid #cbd5e1; margin-left: 5px; text-align: left; line-height: 0.5;"
+					style="font-size: 13px; color: #334155; padding-left: 15px; border-left: 2px solid #cbd5e1; margin-left: 5px; text-align: left; line-height: 1.0;"
 					class="whitespace-pre-line break-words">
 					{!! nl2br(e($candidate->education)) !!}
 				</div>
