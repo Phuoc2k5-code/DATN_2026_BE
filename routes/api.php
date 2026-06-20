@@ -18,6 +18,7 @@ use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\SkillController;
 use App\Http\Controllers\Admin\SystemModerationController;
+use App\Http\Controllers\Admin\StatisticController;
 
 
 
@@ -117,5 +118,8 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
         Route::put('/{id}', [SkillController::class, 'updateSkill']);       // Cập nhật (Sửa)
         Route::delete('/{id}', [SkillController::class, 'destroySkill']);    // Xóa
     });
+
+    // --- báo cáo thống kê
+    Route::get('/statistics', [StatisticController::class, 'getStatistics']);
 
 });
