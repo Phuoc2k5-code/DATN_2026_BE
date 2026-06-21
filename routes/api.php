@@ -51,7 +51,13 @@ Route::middleware('auth:sanctum')->group(function(){
     Route::post('/reports', [ReportController::class, 'store']);
     Route::get('/employer/company', [CompanyController::class, 'getOwnCompany']);
     Route::post('/employer/company/update', [CompanyController::class, 'updateOwnCompany']);
+    Route::get('/employer/jobs', [CompanyController::class, 'getOwnCompanyJobs']);
+    Route::put('/employer/jobs/{id}/toggle-status', [CompanyController::class, 'toggleJobStatus']);
+    Route::put('/employer/jobs/{id}/extend', [CompanyController::class, 'extendJob']);
+    Route::post('/employer/jobs', [CompanyController::class, 'storeJob']);
+    Route::put('/employer/jobs/{id}', [CompanyController::class, 'updateJob']);
 });
+
 
 Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function () {
     Route::get('/users-except-admin', [AdminUserController::class, 'getUsersExceptAdmin']);
