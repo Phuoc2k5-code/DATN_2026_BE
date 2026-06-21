@@ -5,7 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Factories\HasFactory; // 1. Thêm dòng này nếu chưa có
+use Illuminate\Database\Eloquent\Factories\HasFactory; 
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Company extends Model
 {
@@ -25,6 +26,7 @@ class Company extends Model
         'address', 
         'benefits',
         'is_verified',
+        'reject_reason'
     ];
 
     protected function casts(): array
@@ -48,4 +50,9 @@ class Company extends Model
     {
         return $this->hasMany(Report::class, 'company_id', 'id');
     }
+
+    public function applications(): HasManyThrough
+{
+    return $this->hasManyThrough(Application::class, Job::class, 'company_id', 'job_id');
+}
 }
