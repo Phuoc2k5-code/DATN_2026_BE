@@ -19,6 +19,7 @@ use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\SkillController;
 use App\Http\Controllers\Admin\SystemModerationController;
 use App\Http\Controllers\Admin\StatisticController;
+use Illuminate\Support\Facades\DB;
 
 
 
@@ -30,41 +31,53 @@ Route::get('/job-detail/{id}', [HomeController::class, 'JobDetail']);
 Route::get('/companies/{id}', [HomeController::class, 'getCompanyDetail']);
 Route::get('categories', [HomeController::class, 'getCategories']);
 Route::post('/jobs/{id}/click', [HomeController::class, 'trackClick']);
+Route::get('/skills', function () {
+    return response()->json(\Illuminate\Support\Facades\DB::table('skills')->select('id', 'name')->get());
+});
 
 Route::middleware('auth:sanctum')->group(function(){
     //--- Profile 
     Route::get('/user-profile', [UserController::class, 'userProfile']);
     Route::post('/user-profile/update', [UserController::class, 'updateProfile']);
     Route::post('/user-password/update', [UserController::class, 'updatePassword']);
+    
     //--- Quản lý lưu tin
     Route::post('/save-job/{jobId}', [WishlistController::class, 'saveJob']);
     Route::get('/wishlist', [WishlistController::class, 'index']);
-    //--- 
+    
+    //--- Lịch sử ứng tuyển
     Route::get('/applications-history', [AppliedJobController::class, 'history']);
+    
     //--- Quản lý CV
     Route::get('/show-candidate', [CandidateController::class, 'show']);
     Route::post('/save', [CandidateController::class, 'storeOrUpdate']);
     Route::get('get-category', [CandidateController::class, 'getFormData']);
     Route::delete('/delete-candidate', [CandidateController::class, 'deleteCandidate']);
     Route::get('/cv-management', [CandidateController::class, 'index']);
+    
     //--- Mẫu CV    
     Route::get('/cv-templates', [CvTemplateController::class, 'index']);
     Route::get('/cv-management/preview-cv', [CandidateController::class, 'previewCV']);
     Route::post('/cv-management/updateCvTemplate/{id}', [CandidateController::class, 'updateCVTemplate']);
-    //--- upload Cv
+    
+    //--- Upload Cv
     Route::post('/cv-management/upload-cv', [CVFileController::class, 'uploadCV']);
     Route::delete('/cv-management/destroy-file', [CVFileController::class, 'destroyFile']);
     Route::get('/cv-management/download-cv', [CVFileController::class, 'downloadAndSaveCV']);
     Route::get('/cv-management/download-cv/{id}', [CVFileController::class, 'downloadAndSaveCV']);
-    // --- ứng tuyển nhanh
+    
+    // --- Ứng tuyển nhanh
     Route::get('/quick-applyInit', [AppliedJobController::class, 'quickApplyInit']);
     Route::post('/quick-apply', [AppliedJobController::class, 'quickApply']);
+    
     // --- AI gợi ý việc làm 
     Route::get('/user-cv-list', [AIController::class, 'getUserCvList']);
     Route::get('/ai-recomment', [AIController::class, 'getRecommendations']);
-    // --- báo cáo vi phạm
+    
+    // --- Báo cáo vi phạm
     Route::post('/reports', [ReportController::class, 'store']);
-
+    
+    // --- Nhà tuyển dụng quản lý tin và hồ sơ
     Route::get('/employer/company', [CompanyController::class, 'getOwnCompany']);
     Route::post('/employer/company/update', [CompanyController::class, 'updateOwnCompany']);
     Route::get('/employer/jobs', [CompanyController::class, 'getOwnCompanyJobs']);
@@ -72,14 +85,16 @@ Route::middleware('auth:sanctum')->group(function(){
     Route::put('/employer/jobs/{id}/extend', [CompanyController::class, 'extendJob']);
     Route::post('/employer/jobs', [CompanyController::class, 'storeJob']);
     Route::put('/employer/jobs/{id}', [CompanyController::class, 'updateJob']);
-    // --- tạo danh mục
+    Route::get('/employer/candidates', [CompanyController::class, 'getCompanyCandidates']);
+    Route::put('/applications/{id}/status', [CompanyController::class, 'updateApplicationStatus']);
+
+    // --- Tạo nhanh danh mục & kỹ năng
     Route::post('/create-category', [CategoryController::class, 'createCategory']);
     Route::post('/create-skill', [SkillController::class, 'createSkill']);
 });
 
-
 Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function () {
-    //--- quản lý user
+    //--- Quản lý user
     Route::get('/users-except-admin', [AdminUserController::class, 'getUsersExceptAdmin']);
     Route::delete('/users/{id}/lock', [AdminUserController::class, 'lockUser']);
     Route::patch('/users/{id}/unlock', [AdminUserController::class, 'unlockUser']);
@@ -96,7 +111,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::put('/update-cv-templates/{id}', [CvTemplateController::class, 'update']);
     Route::delete('/delete-cv-templates/{id}', [CvTemplateController::class, 'destroy']);
 
-    // --- Trang dashboard
+    // --- Trang dashboard thống kê tổng quan
     Route::get('/dashboard-stats', [AdminController::class, 'getDashboardStats']);
 
     // --- Hệ thống kiểm duyệt (Tin đăng & Doanh nghiệp) ---
@@ -107,7 +122,9 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
         Route::put('/jobs/{id}/approve', [SystemModerationController::class, 'approveJob']);
         Route::put('/companies/{id}/reject', [SystemModerationController::class, 'rejectCompany']);
         Route::put('/companies/{id}/approve', [SystemModerationController::class, 'approveCompany']);
-    });    // --- KHỐI DANH MỤC NGÀNH NGHỀ ---
+    });
+
+    // --- KHỐI DANH MỤC NGÀNH NGHỀ ---
     Route::prefix('categories')->group(function () {
         Route::get('/', [CategoryController::class, 'getCategories']);         // Lấy danh sách
         Route::post('/', [CategoryController::class, 'createCategory']);       // Tạo mới
@@ -123,7 +140,6 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
         Route::delete('/{id}', [SkillController::class, 'destroySkill']);    // Xóa
     });
 
-    // --- báo cáo thống kê
+    // --- Báo cáo thống kê số liệu
     Route::get('/statistics', [StatisticController::class, 'getStatistics']);
-
 });

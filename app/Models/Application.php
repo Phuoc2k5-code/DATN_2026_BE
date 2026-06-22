@@ -43,4 +43,5 @@ class Application extends Model
     {
         return $this->belongsTo(CvFile::class, 'cv_file_id', 'id');
     }
+
 }

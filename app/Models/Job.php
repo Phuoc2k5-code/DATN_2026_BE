@@ -74,5 +74,4 @@ class Job extends Model
     {
         return $this->hasMany(Report::class, 'job_id', 'id');
     }
-
 }
