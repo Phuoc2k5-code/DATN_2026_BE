@@ -416,56 +416,194 @@ class CompanyController extends Controller
 
         //  Kiểm tra nếu có email thì kích hoạt tiến trình gửi thư thật
         if ($candidate && $candidate->email) {
-            try {
-                Mail::to($candidate->email)->send(
-                    new ApplicationStatusChanged($candidate, $newStatus, $companyName)
-                );
-            } catch (\Exception $e) {
-                // Ghi nhận nhật ký lỗi nếu SMTP thất bại nhưng vẫn giữ trạng thái cập nhật database thành công
-                \Illuminate\Support\Facades\Log::error('Lỗi gửi email SMTP: ' . $e->getMessage());
-            }
+        try {
+            // Thay chữ "send" bằng chữ "queue"
+            Mail::to($candidate->email)->queue(
+                new ApplicationStatusChanged($candidate, $newStatus, $companyName)
+            );
+        } catch (\Exception $e) {
+            // Ghi log nếu có lỗi khi đẩy vào hàng đợi
+            \Illuminate\Support\Facades\Log::error('Lỗi đưa email vào Queue: ' . $e->getMessage());
         }
-
+    }
         return response()->json([
             'success' => true, 
             'message' => 'Cập nhật trạng thái và gửi email thông báo thành công!'
         ]);
     }
-        public function getCandidates(Request $request) 
-{
-    //  Khởi tạo query từ bảng candidates của bạn
-    $query = DB::table('candidates');
+            public function getCandidates(Request $request) 
+    {
+        //  Khởi tạo query từ bảng candidates của bạn
+        $query = DB::table('candidates');
 
-    //Lọc theo Kỹ năng (Sử dụng bảng trung gian candidate_skill)
-    if ($request->has('skill') && $request->input('skill') !== 'Tất cả') {
-        $skillId = $request->input('skill');
+        //Lọc theo Kỹ năng (Sử dụng bảng trung gian candidate_skill)
+        if ($request->has('skill') && $request->input('skill') !== 'Tất cả') {
+            $skillId = $request->input('skill');
 
-        $query->whereExists(function ($q) use ($skillId) {
-            $q->select(DB::raw(1))
-              ->from('candidate_skill')
-              // Khớp id của bảng candidates với candidate_id của bảng trung gian
-              ->whereColumn('candidate_skill.candidate_id', 'candidates.id') 
-              ->where('candidate_skill.skill_id', $skillId);
-        });
-    }
-
-    //  Lọc theo Kinh nghiệm (Dựa vào cột experience_years trong DB của bạn)
-    if ($request->has('experience') && $request->input('experience') !== 'Tất cả') {
-        $exp = $request->input('experience');
-        if ($exp === 'fresher') {
-            $query->where('candidates.experience_years', '<', 2);
-        } elseif ($exp === 'junior') {
-            $query->whereBetween('candidates.experience_years', [2, 4]);
-        } elseif ($exp === 'senior') {
-            $query->where('candidates.experience_years', '>', 4);
+            $query->whereExists(function ($q) use ($skillId) {
+                $q->select(DB::raw(1))
+                ->from('candidate_skill')
+                // Khớp id của bảng candidates với candidate_id của bảng trung gian
+                ->whereColumn('candidate_skill.candidate_id', 'candidates.id') 
+                ->where('candidate_skill.skill_id', $skillId);
+            });
         }
-    }
 
-    //  Lọc theo Học vấn (Dựa vào cột education trong DB của bạn)
-    if ($request->has('edu') && $request->input('edu') !== 'Tất cả') {
-        $query->where('candidates.education', 'LIKE', '%' . $request->input('edu') . '%');
-    }
+        //  Lọc theo Kinh nghiệm (Dựa vào cột experience_years trong DB của bạn)
+        if ($request->has('experience') && $request->input('experience') !== 'Tất cả') {
+            $exp = $request->input('experience');
+            if ($exp === 'fresher') {
+                $query->where('candidates.experience_years', '<', 2);
+            } elseif ($exp === 'junior') {
+                $query->whereBetween('candidates.experience_years', [2, 4]);
+            } elseif ($exp === 'senior') {
+                $query->where('candidates.experience_years', '>', 4);
+            }
+        }
 
-    return response()->json($query->get());
-}
+        //  Lọc theo Học vấn (Dựa vào cột education trong DB của bạn)
+        if ($request->has('edu') && $request->input('edu') !== 'Tất cả') {
+            $query->where('candidates.education', 'LIKE', '%' . $request->input('edu') . '%');
+        }
+
+        return response()->json($query->get());
+    }
+    public function getDashboardStats(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) return response()->json(['success' => false, 'message' => 'Hết hạn phiên.'], 401);
+
+        $company = \App\Models\Company::where('user_id', $user->id)->first();
+        if (!$company) return response()->json(['success' => false, 'message' => 'Chưa cấu hình công ty.'], 404);
+
+        // 1. Đếm TỔNG số tin tuyển dụng của công ty này
+        $totalJobs = \Illuminate\Support\Facades\DB::table('jobs')
+            ->where('company_id', $company->id)
+            ->count();
+
+        // 2. Đếm số tin ĐANG CHẠY
+        // LƯU Ý: Chữ 'active' ở dưới tùy thuộc vào cách bạn lưu trong DB. 
+        // Nếu DB bạn lưu là 1 (hoạt động), 0 (ẩn) thì sửa thành ->where('status', 1) nhé.
+        $activeJobs = \Illuminate\Support\Facades\DB::table('jobs')
+            ->where('company_id', $company->id)
+            ->where('status', 'active') 
+            ->count();
+        $totalCVs = \Illuminate\Support\Facades\DB::table('applications')
+        ->join('jobs', 'applications.job_id', '=', 'jobs.id')
+        ->where('jobs.company_id', $company->id)
+        ->count();
+       $totalViews = \Illuminate\Support\Facades\DB::table('job_clicks')
+        ->join('jobs', 'job_clicks.job_id', '=', 'jobs.id') // Gộp với bảng jobs để lọc theo công ty[cite: 1]
+        ->where('jobs.company_id', $company->id)
+        ->sum('job_clicks.click_count');
+        $interviewCVs = \Illuminate\Support\Facades\DB::table('applications')
+        ->join('jobs', 'applications.job_id', '=', 'jobs.id')
+        ->where('jobs.company_id', $company->id)
+        ->where('applications.status', 'Phỏng vấn') 
+        ->count();
+
+        // Tính tỷ lệ %, dùng toán tử ba ngôi để tránh lỗi chia cho 0 (Division by zero) nếu chưa có ai nộp bài
+        $interviewRate = $totalCVs > 0 ? round(($interviewCVs / $totalCVs) * 100, 1) : 0;
+
+       // Nhận số tuần cần lùi về từ Request (0: Tuần này, 1: Tuần trước, 2: 2 tuần trước...)
+            $weekOffset = (int) $request->input('week_offset', 0); // Lấy số tuần lùi về từ React
+
+        // Dùng copy() để không làm biến dạng ngày gốc
+        $baseDate = \Carbon\Carbon::now()->subWeeks($weekOffset);
+        $startOfWeek = $baseDate->copy()->startOfWeek()->format('Y-m-d');
+        $endOfWeek = $baseDate->copy()->endOfWeek()->format('Y-m-d');
+
+        $dailyClicks = \Illuminate\Support\Facades\DB::table('job_clicks')
+            ->join('jobs', 'job_clicks.job_id', '=', 'jobs.id')
+            ->select(
+                \Illuminate\Support\Facades\DB::raw('DATE(job_clicks.click_date) as date'), 
+                \Illuminate\Support\Facades\DB::raw('SUM(job_clicks.click_count) as total_clicks')
+            )
+            ->where('jobs.company_id', $company->id)
+            ->whereBetween('job_clicks.click_date', [$startOfWeek, $endOfWeek])
+            ->groupBy('date')
+            ->get()
+            ->keyBy('date');
+
+        $weeklyViewsChart = [];
+        $dayLabels = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'];
+        
+        // ÉP BUỘC SINH RA 7 NGÀY (Dù database không có dòng nào thì vẫn tạo ra cột = 0)
+        for ($i = 0; $i < 7; $i++) {
+            $currentDay = $baseDate->copy()->startOfWeek()->addDays($i);
+            $date = $currentDay->format('Y-m-d');
+            
+            $clicks = isset($dailyClicks[$date]) ? (int) $dailyClicks[$date]->total_clicks : 0;
+            
+            $weeklyViewsChart[] = [
+                'label' => $dayLabels[$i],
+                'date_format' => $currentDay->format('d/m'), // Sinh ngày tháng chuẩn
+                'clicks' => $clicks // Sẽ bằng 0 nếu tuần đó trống
+            ];
+        }
+            // Lấy danh sách tất cả job_id thuộc về công ty này
+        $jobIds = \Illuminate\Support\Facades\DB::table('jobs')
+            ->where('company_id', $company->id)
+            ->pluck('id')
+            ->toArray();
+
+        $cvChartData = [];
+    
+        // Lấy thời điểm hiện tại và mốc ngày 1 của tháng này
+        $now = \Carbon\Carbon::now();
+        $startOfMonth = $now->copy()->startOfMonth();
+
+        // Định nghĩa chia lô 4 tuần quét sạch các ngày trong tháng
+        $weeks = [
+            1 => [
+                'start' => $startOfMonth->copy(),
+                'end'   => $startOfMonth->copy()->addDays(6)->endOfDay() // Ngày 1 -> 7
+            ],
+            2 => [
+                'start' => $startOfMonth->copy()->addDays(7),
+                'end'   => $startOfMonth->copy()->addDays(13)->endOfDay() // Ngày 8 -> 14
+            ],
+            3 => [
+                'start' => $startOfMonth->copy()->addDays(14),
+                'end'   => $startOfMonth->copy()->addDays(20)->endOfDay() // Ngày 15 -> 21
+            ],
+            4 => [
+                'start' => $startOfMonth->copy()->addDays(21),
+                'end'   => $startOfMonth->copy()->endOfMonth()->endOfDay() // Ngày 22 -> Cuối tháng
+            ],
+        ];
+
+        foreach ($weeks as $weekNum => $dates) {
+            $cvCount = 0;
+
+            if (!empty($jobIds)) {
+                $cvCount = \Illuminate\Support\Facades\DB::table('applications')
+                    ->whereIn('job_id', $jobIds)
+                    ->whereBetween('applied_at', [$dates['start'], $dates['end']]) // CHÚ Ý: Đã đổi sang cột applied_at
+                    ->count();
+            }
+
+            // Tự động kiểm tra xem ngày hôm nay có nằm trong tuần này không để Frontend tô màu đậm
+            $isCurrent = $now->between($dates['start'], $dates['end']);
+
+            $cvChartData[] = [
+                'label'      => 'Tuần ' . $weekNum,
+                'range'      => $dates['start']->format('d/m') . ' - ' . $dates['end']->format('d/m'),
+                'cvs'        => $cvCount,
+                'is_current' => $isCurrent 
+            ];
+        }
+            return response()->json([
+            'success' => true,
+            'data' => [
+                'totalJobs' => $totalJobs,
+                'activeJobs' => $activeJobs,
+                'totalCVs' => $totalCVs,
+                'totalViews' => (int)$totalViews,
+                'interviewRate' => $interviewRate,
+                'weeklyViewsChart' => $weeklyViewsChart,
+                'cvChartData' => $cvChartData,
+            ]
+        ], 200);
+    }
 }

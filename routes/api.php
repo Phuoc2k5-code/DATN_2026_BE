@@ -87,6 +87,7 @@ Route::middleware('auth:sanctum')->group(function(){
     Route::put('/employer/jobs/{id}', [CompanyController::class, 'updateJob']);
     Route::get('/employer/candidates', [CompanyController::class, 'getCompanyCandidates']);
     Route::put('/applications/{id}/status', [CompanyController::class, 'updateApplicationStatus']);
+    Route::get('/employer/dashboard-stats', [\App\Http\Controllers\Employer\CompanyController::class, 'getDashboardStats']);
 
     // --- Tạo nhanh danh mục & kỹ năng
     Route::post('/create-category', [CategoryController::class, 'createCategory']);
