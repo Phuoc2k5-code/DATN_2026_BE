@@ -35,4 +35,8 @@ class CvFile extends Model
     {
         return $this->belongsTo(User::class, 'user_id', 'id');
     }
+    public function candidate() {
+    // liên kết với user_id của bảng cv_files
+    return $this->belongsTo(Candidate::class, 'user_id', 'user_id');
+    }
 }

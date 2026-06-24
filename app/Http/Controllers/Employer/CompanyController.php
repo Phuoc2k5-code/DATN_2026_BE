@@ -4,7 +4,12 @@ namespace App\Http\Controllers\Employer;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Models\Company; // Đảm bảo bạn đã tạo Model Company kết nối đến bảng companies
+use App\Models\Company;
+use App\Models\Job;
+use App\Models\Category;
+use Illuminate\Support\Facades\DB; 
+use Illuminate\Support\Facades\Mail;
+use App\Mail\ApplicationStatusChanged;
 
 class CompanyController extends Controller
 {
@@ -78,6 +83,527 @@ class CompanyController extends Controller
             'success' => true,
             'message' => 'Cập nhật thông tin công ty thành công!',
             'data' => $company
+        ], 200);
+    }
+      public function getOwnCompanyJobs(Request $request)
+    {
+    $user = $request->user(); 
+    if (!$user) {
+        return response()->json(['success' => false, 'message' => 'Phiên đăng nhập đã hết hạn.'], 401);
+    }
+
+    $company = Company::where('user_id', $user->id)->first();
+    if (!$company) {
+        return response()->json(['success' => false, 'message' => 'Chưa cấu hình thông tin doanh nghiệp.'], 404);
+    }
+
+    $jobs = Job::where('company_id', $company->id)
+        ->leftJoin('categories', 'jobs.category_id', '=', 'categories.id')
+        
+        // Cú pháp chọn lấy mọi cột của jobs và lấy tên category
+        ->select('jobs.*', 'categories.name as category_name')
+        
+        // 1. Format lại ngày hết hạn
+        ->selectRaw('DATE_FORMAT(jobs.expired_at, "%d/%m/%Y") as deadline')
+        
+        // 2. Tự động phiên dịch Trạng thái từ Database (Tiếng Anh -> Tiếng Việt)
+        ->selectRaw('
+            CASE 
+                WHEN jobs.status = "active" THEN "Vận hành"
+                WHEN jobs.status = "closed" THEN "Tạm đóng"
+                WHEN jobs.status = "pending" THEN "Chờ duyệt"
+                ELSE jobs.status 
+            END as status
+        ')
+        
+        // 3. Đếm tổng lượt xem
+        ->selectRaw('(SELECT COALESCE(SUM(click_count), 0) FROM job_clicks WHERE job_clicks.job_id = jobs.id) as views')
+        
+        // 4. Đếm tổng số lượng CV nộp vào
+        ->selectRaw('(SELECT COUNT(*) FROM applications WHERE applications.job_id = jobs.id) as applicants')
+        
+        ->orderBy('jobs.created_at', 'desc')
+        ->get();
+
+    return response()->json([
+        'success' => true,
+        'data' => $jobs
+    ], 200);
+    }
+        public function toggleJobStatus(Request $request, $id)
+    {
+        // 1. Xác thực tài khoản nhà tuyển dụng
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Phiên đăng nhập đã hết hạn.'], 401);
+        }
+
+        $company = Company::where('user_id', $user->id)->first();
+        if (!$company) {
+            return response()->json(['success' => false, 'message' => 'Chưa cấu hình công ty.'], 404);
+        }
+
+        // 2. Tìm bài đăng tuyển dụng theo ID (Bảo mật: Phải thuộc đúng công ty này)
+        $job = Job::where('id', $id)->where('company_id', $company->id)->first();
+
+        if (!$job) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy tin tuyển dụng.'], 404);
+        }
+
+        // 3. Chặn thao tác nếu tin đang ở trạng thái Chờ duyệt (pending)
+        if ($job->status === 'pending') {
+            return response()->json(['success' => false, 'message' => 'Tin đang chờ Admin duyệt, không thể thay đổi.'], 400);
+        }
+
+        // 4. Thực hiện đảo ngược trạng thái (active <-> closed)
+        $job->status = ($job->status === 'active') ? 'closed' : 'active';
+        $job->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Cập nhật trạng thái thành công!'
+        ], 200);
+    }
+        public function extendJob(Request $request, $id)
+    {
+        $user = $request->user();
+        if (!$user) return response()->json(['success' => false, 'message' => 'Hết hạn phiên.'], 401);
+
+        $company = Company::where('user_id', $user->id)->first();
+        if (!$company) return response()->json(['success' => false, 'message' => 'Chưa cấu hình công ty.'], 404);
+
+        $job = Job::where('id', $id)->where('company_id', $company->id)->first();
+        if (!$job) return response()->json(['success' => false, 'message' => 'Không tìm thấy tin tuyển dụng.'], 404);
+
+        // Kiểm tra dữ liệu ngày tháng gửi lên
+        $request->validate([
+            'new_deadline' => 'required|date|after:today',
+        ], [
+            'new_deadline.required' => 'Vui lòng chọn ngày gia hạn.',
+            'new_deadline.after' => 'Ngày gia hạn phải tính từ ngày mai trở đi.'
+        ]);
+
+        // Cập nhật ngày hết hạn mới (Mặc định cho hết hạn vào 23:59:59 của ngày đó)
+        $job->expired_at = $request->new_deadline . ' 23:59:59';
+        
+        if ($job->status === 'closed') {
+            $job->status = 'active';
+        }
+        
+        $job->save();
+
+        return response()->json([
+            'success' => true, 
+            'message' => 'Gia hạn thành công! Tin đã được cập nhật.'
+        ], 200);
+    }
+        public function storeJob(Request $request)
+    {
+        // Xác thực người dùng và công ty
+        $user = $request->user();
+        if (!$user) return response()->json(['success' => false, 'message' => 'Hết hạn phiên.'], 401);
+
+        $company = Company::where('user_id', $user->id)->first();
+        if (!$company) return response()->json(['success' => false, 'message' => 'Chưa cấu hình công ty.'], 404);
+
+        // Kiểm tra dữ liệu Form gửi lên
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'category_id' => 'required|integer',
+            'level' => 'required|string',
+            'salary_min' => 'nullable|numeric',
+            'salary_max' => 'nullable|numeric',
+            'is_negotiable' => 'boolean',
+            'location' => 'required|string',
+            'description' => 'required|string',
+            'requirements' => 'required|string',
+            'benefits' => 'nullable|string',
+            'expired_at' => 'required|date|after:today',
+        ]);
+
+        // Tạo bản ghi mới trong bảng jobs
+        $job = new Job();
+        $job->company_id = $company->id;
+        $job->category_id = $validated['category_id'];
+        $job->title = $validated['title'];
+        $job->level = $validated['level'];
+        $job->salary_min = $validated['salary_min'];
+        $job->salary_max = $validated['salary_max'];
+        $job->is_negotiable = $validated['is_negotiable'] ?? 0;
+        $job->location = $validated['location'];
+        $job->description = $validated['description'];
+        $job->requirements = $validated['requirements'];
+        $job->benefits = $validated['benefits'] ?? null;
+        $job->expired_at = $validated['expired_at'] . ' 23:59:59';
+        $job->status = 'pending'; // Tin mới đăng tự động đưa vào trạng thái Chờ duyệt
+        $job->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Đăng tin thành công! Vui lòng chờ Quản trị viên phê duyệt.'
+        ], 201);
+    }
+        public function updateJob(Request $request, $id)
+    {
+        $user = $request->user();
+        if (!$user) return response()->json(['success' => false, 'message' => 'Hết hạn phiên.'], 401);
+
+        $company = Company::where('user_id', $user->id)->first();
+        if (!$company) return response()->json(['success' => false, 'message' => 'Chưa cấu hình công ty.'], 404);
+
+        // Tìm bài đăng cần sửa
+        $job = Job::where('id', $id)->where('company_id', $company->id)->first();
+        if (!$job) return response()->json(['success' => false, 'message' => 'Không tìm thấy tin tuyển dụng.'], 404);
+
+        // Kiểm tra dữ liệu (Không cần validate expired_at vì mình đã có chức năng Gia hạn riêng)
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'category_id' => 'required|integer',
+            'level' => 'required|string',
+            'salary_min' => 'nullable|numeric',
+            'salary_max' => 'nullable|numeric',
+            'is_negotiable' => 'boolean',
+            'location' => 'required|string',
+            'description' => 'required|string',
+            'requirements' => 'required|string',
+            'benefits' => 'nullable|string',
+        ]);
+
+        // Cập nhật dữ liệu
+        $job->category_id = $validated['category_id'];
+        $job->title = $validated['title'];
+        $job->level = $validated['level'];
+        $job->salary_min = $validated['salary_min'];
+        $job->salary_max = $validated['salary_max'];
+        $job->is_negotiable = $validated['is_negotiable'] ?? 0;
+        $job->location = $validated['location'];
+        $job->description = $validated['description'];
+        $job->requirements = $validated['requirements'];
+        $job->benefits = $validated['benefits'] ?? null;
+        
+        // ĐIỂM QUAN TRỌNG: Đổi trạng thái về chờ duyệt để Admin kiểm tra lại nội dung mới
+        $job->status = 'pending'; 
+
+        $job->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Cập nhật thành công! Tin của bạn đã được chuyển về trạng thái Chờ duyệt.'
+        ], 200);
+    }
+       public function getCompanyCandidates(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) return response()->json(['success' => false, 'message' => 'Hết hạn phiên.'], 401);
+
+        $company = \App\Models\Company::where('user_id', $user->id)->first();
+        if (!$company) return response()->json(['success' => false, 'message' => 'Chưa cấu hình công ty.'], 404);
+
+        // 1. Khởi tạo Query (Chú ý dấu chấm phẩy ở cuối dòng orderBy)
+        $query = \Illuminate\Support\Facades\DB::table('jobs')
+            ->join('applications', 'jobs.id', '=', 'applications.job_id')
+            ->join('cv_files', 'applications.cv_file_id', '=', 'cv_files.id')
+            ->join('candidates', 'cv_files.user_id', '=', 'candidates.user_id')
+            ->where('jobs.company_id', $company->id)
+            ->select(
+                'applications.id',
+                'candidates.full_name as name',
+                'applications.status',
+                'applications.applied_at as timeApplied',
+                'jobs.title as jobTitle',
+                'candidates.experience_years as exp',
+                'candidates.education',
+                'candidates.email',
+                'cv_files.file_path',
+                'applications.matching_score'
+            )
+            ->orderBy('applications.applied_at', 'desc'); 
+
+        // 2. Chèn bộ lọc kỹ năng
+        if ($request->has('skill') && $request->skill !== 'Tất cả') {
+            $skillId = $request->skill; 
+
+            $query->whereExists(function ($q) use ($skillId) {
+                $q->select(\Illuminate\Support\Facades\DB::raw(1))
+                    ->from('candidate_skill')
+                    ->whereColumn('candidate_skill.candidate_id', 'candidates.id')
+                    ->where('candidate_skill.skill_id', $skillId);
+            });
+        }
+
+        // 3. Thực thi lấy dữ liệu
+       $candidates = $query->get();
+
+        // 4. KIỂM TRA: Nếu không có ứng viên nào, trả về mảng rỗng để không bị lỗi map
+        if ($candidates->isEmpty()) {
+            return response()->json([
+                'success' => true,
+                'data' => []
+            ], 200);
+        }
+
+        // 5. Format dữ liệu
+        $formattedCandidates = $candidates->map(function ($item) {
+            $statusMap = [
+                'pending' => 'Chờ duyệt',
+                'viewed' => 'Đã xem',
+                'interviewing' => 'Phỏng vấn',
+                'accepted' => 'Nhận việc',
+                'rejected' => 'Từ chối'
+            ];
+
+            return [
+                'id' => $item->id,
+                'name' => $item->name,
+                'status' => $statusMap[$item->status] ?? $item->status,
+                'timeApplied' => isset($item->timeApplied) ? date('d/m/Y H:i', strtotime($item->timeApplied)) : 'N/A',
+                'jobTitle' => $item->jobTitle,
+                'exp' => $item->exp,
+                'education' => $item->education ?? 'Chưa cập nhật',
+                'email' => $item->email,
+                'file_path' => $item->file_path,
+                'matchScore' => $item->matching_score,
+                'skills' => [] 
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => $formattedCandidates
+        ], 200);
+    }
+        public function updateApplicationStatus(Request $request, $id)
+    {
+        // Xác thực tài khoản nhà tuyển dụng đang đăng nhập
+        $user = $request->user();
+        $company = DB::table('companies')->where('user_id', $user->id)->first();
+
+        if (!$company) {
+            return response()->json([
+                'success' => false, 
+                'message' => 'Tài khoản không có quyền thực hiện hành động này.'
+            ], 403);
+        }
+
+        // Tên công ty động dùng làm tên người gửi thư
+        $companyName = $company->company_name ?? 'Công ty của tôi'; 
+
+        //  Tìm kiếm đơn ứng tuyển cần cập nhật trạng thái
+        $application = DB::table('applications')->where('id', $id)->first();
+        if (!$application) {
+            return response()->json([
+                'success' => false, 
+                'message' => 'Đơn ứng tuyển không tồn tại.'
+            ], 404);
+        }
+
+        //Tiến hành cập nhật trạng thái mới vào Database
+        $newStatus = $request->status; // Trạng thái truyền từ ReactJS lên
+        DB::table('applications')
+            ->where('id', $id)
+            ->update([
+                'status' => $newStatus,
+                'updated_at' => now()
+            ]);
+
+        // Lấy thông tin ứng viên liên kết với đơn ứng tuyển để lấy Email nhận thư
+        // Kết nối qua bảng trung gian cv_files để tìm thông tin chính xác nhất của Candidate
+        $candidate = DB::table('cv_files')
+            ->join('candidates', 'cv_files.user_id', '=', 'candidates.user_id')
+            ->where('cv_files.id', $application->cv_file_id)
+            ->select('candidates.full_name', 'candidates.email')
+            ->first();
+
+        //  Kiểm tra nếu có email thì kích hoạt tiến trình gửi thư thật
+        if ($candidate && $candidate->email) {
+        try {
+            // Thay chữ "send" bằng chữ "queue"
+            Mail::to($candidate->email)->queue(
+                new ApplicationStatusChanged($candidate, $newStatus, $companyName)
+            );
+        } catch (\Exception $e) {
+            // Ghi log nếu có lỗi khi đẩy vào hàng đợi
+            \Illuminate\Support\Facades\Log::error('Lỗi đưa email vào Queue: ' . $e->getMessage());
+        }
+    }
+        return response()->json([
+            'success' => true, 
+            'message' => 'Cập nhật trạng thái và gửi email thông báo thành công!'
+        ]);
+    }
+            public function getCandidates(Request $request) 
+    {
+        //  Khởi tạo query từ bảng candidates của bạn
+        $query = DB::table('candidates');
+
+        //Lọc theo Kỹ năng (Sử dụng bảng trung gian candidate_skill)
+        if ($request->has('skill') && $request->input('skill') !== 'Tất cả') {
+            $skillId = $request->input('skill');
+
+            $query->whereExists(function ($q) use ($skillId) {
+                $q->select(DB::raw(1))
+                ->from('candidate_skill')
+                // Khớp id của bảng candidates với candidate_id của bảng trung gian
+                ->whereColumn('candidate_skill.candidate_id', 'candidates.id') 
+                ->where('candidate_skill.skill_id', $skillId);
+            });
+        }
+
+        //  Lọc theo Kinh nghiệm (Dựa vào cột experience_years trong DB của bạn)
+        if ($request->has('experience') && $request->input('experience') !== 'Tất cả') {
+            $exp = $request->input('experience');
+            if ($exp === 'fresher') {
+                $query->where('candidates.experience_years', '<', 2);
+            } elseif ($exp === 'junior') {
+                $query->whereBetween('candidates.experience_years', [2, 4]);
+            } elseif ($exp === 'senior') {
+                $query->where('candidates.experience_years', '>', 4);
+            }
+        }
+
+        //  Lọc theo Học vấn (Dựa vào cột education trong DB của bạn)
+        if ($request->has('edu') && $request->input('edu') !== 'Tất cả') {
+            $query->where('candidates.education', 'LIKE', '%' . $request->input('edu') . '%');
+        }
+
+        return response()->json($query->get());
+    }
+    public function getDashboardStats(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) return response()->json(['success' => false, 'message' => 'Hết hạn phiên.'], 401);
+
+        $company = \App\Models\Company::where('user_id', $user->id)->first();
+        if (!$company) return response()->json(['success' => false, 'message' => 'Chưa cấu hình công ty.'], 404);
+
+        // 1. Đếm TỔNG số tin tuyển dụng của công ty này
+        $totalJobs = \Illuminate\Support\Facades\DB::table('jobs')
+            ->where('company_id', $company->id)
+            ->count();
+
+        // 2. Đếm số tin ĐANG CHẠY
+        // LƯU Ý: Chữ 'active' ở dưới tùy thuộc vào cách bạn lưu trong DB. 
+        // Nếu DB bạn lưu là 1 (hoạt động), 0 (ẩn) thì sửa thành ->where('status', 1) nhé.
+        $activeJobs = \Illuminate\Support\Facades\DB::table('jobs')
+            ->where('company_id', $company->id)
+            ->where('status', 'active') 
+            ->count();
+        $totalCVs = \Illuminate\Support\Facades\DB::table('applications')
+        ->join('jobs', 'applications.job_id', '=', 'jobs.id')
+        ->where('jobs.company_id', $company->id)
+        ->count();
+       $totalViews = \Illuminate\Support\Facades\DB::table('job_clicks')
+        ->join('jobs', 'job_clicks.job_id', '=', 'jobs.id') // Gộp với bảng jobs để lọc theo công ty[cite: 1]
+        ->where('jobs.company_id', $company->id)
+        ->sum('job_clicks.click_count');
+        $interviewCVs = \Illuminate\Support\Facades\DB::table('applications')
+        ->join('jobs', 'applications.job_id', '=', 'jobs.id')
+        ->where('jobs.company_id', $company->id)
+        ->where('applications.status', 'Phỏng vấn') 
+        ->count();
+
+        // Tính tỷ lệ %, dùng toán tử ba ngôi để tránh lỗi chia cho 0 (Division by zero) nếu chưa có ai nộp bài
+        $interviewRate = $totalCVs > 0 ? round(($interviewCVs / $totalCVs) * 100, 1) : 0;
+
+       // Nhận số tuần cần lùi về từ Request (0: Tuần này, 1: Tuần trước, 2: 2 tuần trước...)
+            $weekOffset = (int) $request->input('week_offset', 0); // Lấy số tuần lùi về từ React
+
+        // Dùng copy() để không làm biến dạng ngày gốc
+        $baseDate = \Carbon\Carbon::now()->subWeeks($weekOffset);
+        $startOfWeek = $baseDate->copy()->startOfWeek()->format('Y-m-d');
+        $endOfWeek = $baseDate->copy()->endOfWeek()->format('Y-m-d');
+
+        $dailyClicks = \Illuminate\Support\Facades\DB::table('job_clicks')
+            ->join('jobs', 'job_clicks.job_id', '=', 'jobs.id')
+            ->select(
+                \Illuminate\Support\Facades\DB::raw('DATE(job_clicks.click_date) as date'), 
+                \Illuminate\Support\Facades\DB::raw('SUM(job_clicks.click_count) as total_clicks')
+            )
+            ->where('jobs.company_id', $company->id)
+            ->whereBetween('job_clicks.click_date', [$startOfWeek, $endOfWeek])
+            ->groupBy('date')
+            ->get()
+            ->keyBy('date');
+
+        $weeklyViewsChart = [];
+        $dayLabels = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'];
+        
+        // ÉP BUỘC SINH RA 7 NGÀY (Dù database không có dòng nào thì vẫn tạo ra cột = 0)
+        for ($i = 0; $i < 7; $i++) {
+            $currentDay = $baseDate->copy()->startOfWeek()->addDays($i);
+            $date = $currentDay->format('Y-m-d');
+            
+            $clicks = isset($dailyClicks[$date]) ? (int) $dailyClicks[$date]->total_clicks : 0;
+            
+            $weeklyViewsChart[] = [
+                'label' => $dayLabels[$i],
+                'date_format' => $currentDay->format('d/m'), // Sinh ngày tháng chuẩn
+                'clicks' => $clicks // Sẽ bằng 0 nếu tuần đó trống
+            ];
+        }
+            // Lấy danh sách tất cả job_id thuộc về công ty này
+        $jobIds = \Illuminate\Support\Facades\DB::table('jobs')
+            ->where('company_id', $company->id)
+            ->pluck('id')
+            ->toArray();
+
+        $cvChartData = [];
+    
+        // Lấy thời điểm hiện tại và mốc ngày 1 của tháng này
+        $now = \Carbon\Carbon::now();
+        $startOfMonth = $now->copy()->startOfMonth();
+
+        // Định nghĩa chia lô 4 tuần quét sạch các ngày trong tháng
+        $weeks = [
+            1 => [
+                'start' => $startOfMonth->copy(),
+                'end'   => $startOfMonth->copy()->addDays(6)->endOfDay() // Ngày 1 -> 7
+            ],
+            2 => [
+                'start' => $startOfMonth->copy()->addDays(7),
+                'end'   => $startOfMonth->copy()->addDays(13)->endOfDay() // Ngày 8 -> 14
+            ],
+            3 => [
+                'start' => $startOfMonth->copy()->addDays(14),
+                'end'   => $startOfMonth->copy()->addDays(20)->endOfDay() // Ngày 15 -> 21
+            ],
+            4 => [
+                'start' => $startOfMonth->copy()->addDays(21),
+                'end'   => $startOfMonth->copy()->endOfMonth()->endOfDay() // Ngày 22 -> Cuối tháng
+            ],
+        ];
+
+        foreach ($weeks as $weekNum => $dates) {
+            $cvCount = 0;
+
+            if (!empty($jobIds)) {
+                $cvCount = \Illuminate\Support\Facades\DB::table('applications')
+                    ->whereIn('job_id', $jobIds)
+                    ->whereBetween('applied_at', [$dates['start'], $dates['end']]) // CHÚ Ý: Đã đổi sang cột applied_at
+                    ->count();
+            }
+
+            // Tự động kiểm tra xem ngày hôm nay có nằm trong tuần này không để Frontend tô màu đậm
+            $isCurrent = $now->between($dates['start'], $dates['end']);
+
+            $cvChartData[] = [
+                'label'      => 'Tuần ' . $weekNum,
+                'range'      => $dates['start']->format('d/m') . ' - ' . $dates['end']->format('d/m'),
+                'cvs'        => $cvCount,
+                'is_current' => $isCurrent 
+            ];
+        }
+            return response()->json([
+            'success' => true,
+            'data' => [
+                'totalJobs' => $totalJobs,
+                'activeJobs' => $activeJobs,
+                'totalCVs' => $totalCVs,
+                'totalViews' => (int)$totalViews,
+                'interviewRate' => $interviewRate,
+                'weeklyViewsChart' => $weeklyViewsChart,
+                'cvChartData' => $cvChartData,
+            ]
         ], 200);
     }
 }
