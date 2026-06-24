@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Password;
 
 use App\Models\User;
 use App\Models\Candidate;
@@ -162,11 +163,19 @@ class UserController extends Controller
     // 1. Kiểm tra cấu trúc form mật khẩu từ Front-end gửi lên
     $validator = Validator::make($request->all(), [
       'current_password' => 'required|string',
-      'new_password' => 'required|string|min:6', // Mật khẩu mới tối thiểu 6 ký tự bảo mật
+      'new_password' => [
+        'required',
+        'confirmed',
+        Password::min(8)          // Tối thiểu 8 ký tự
+          ->letters()           // Phải có cả chữ cái
+          ->mixedCase()         // Phải có cả chữ HOA và chữ thường
+          ->numbers()           // Phải có chữ số (0-9)
+          ->symbols(),          // Phải có ký tự đặc biệt (!, @, #, $,...)
+      ], // Mật khẩu mới tối thiểu 6 ký tự bảo mật
     ], [
       'current_password.required' => 'Mật khẩu hiện tại không được để trống.',
       'new_password.required' => 'Mật khẩu mới không được để trống.',
-      'new_password.min' => 'Mật khẩu mới phải có ít nhất 6 ký tự.',
+      'password' => 'Mật khẩu phải tối thiểu 8 ký tự, bao gồm cả chữ hoa, chữ thường, số và ký tự đặc biệt.',
     ]);
 
     if ($validator->fails()) {
