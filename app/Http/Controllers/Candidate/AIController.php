@@ -20,99 +20,171 @@ class AIController extends Controller
   public function getRecommendations(Request $request): JsonResponse
   {
     $userId = auth()->id();
-    // dữ liệu mà hệ thống nhận được
-    $chosenType = $request->input('type'); // 'online' hoặc 'uploaded'
-    $chosenId = $request->input('id');     // ID của Candidate hoặc CvFile
 
-    Log::info("====================================================");
-    Log::info("🤖 [AI RECOMMENDATION] Khởi động bộ lọc thông minh cho User ID: " . $userId);
+    // Dữ liệu nhận từ Frontend gửi lên
+    $chosenType = $request->input('type'); // 'online' hoặc 'uploaded'
+    $chosenId = $request->input('id');     // ID cụ thể của hồ sơ/file
+
+    Log::info("=====================================================================");
+    Log::info("🤖 [AI ATS START] Bắt đầu xử lý đề xuất cho User ID: " . $userId);
+    Log::info("📥 [PARAMS INPUT] Frontend gửi lên -> Type: [" . ($chosenType ?? 'NULL') . "], ID: [" . ($chosenId ?? 'NULL') . "]");
 
     try {
-      // biến lưu dữ liệu lấy đc để gửi cho AI
+      // Biến lưu trữ nội dung văn bản CV thô sau khi bóc tách
       $cvContentText = "";
 
-      // BƯỚC 1: XÁC ĐỊNH NỘI DUNG CV (TỰ ĐỘNG HOẶC USER CHỌN)
+      // Cờ đánh dấu xem Người dùng đang chủ động click chọn hay đang chạy tự động
+      $isUserSelecting = !empty($chosenType) && !empty($chosenId);
 
-      // TRƯỜNG HỢP 1: Chọn Hồ sơ Online HOẶC Chạy Tự động ban đầu (Ưu tiên Online)
-      if ($chosenType === 'online' || (empty($chosenType) && empty($chosenId))) {
-        $query = Candidate::with(['skills', 'category'])->where('user_id', $userId);
-        $candidate = ($chosenId && $chosenType === 'online') ? $query->find($chosenId) : $query->first(); // lấy hồ sơ đầu tiên hoặc lấy theo id mà hệ thống gửi về 
+      // =====================================================================
+      // LUỒNG 1: USER CHỦ ĐỘNG CHỌN CV TRÊN DROPDOWN (CÓ PARAMS CỤ THỂ)
+      // =====================================================================
+      if ($isUserSelecting) {
+        Log::info("🎯 [LUỒNG 1] Phát hiện thao tác click chọn cụ thể từ người dùng.");
+
+        // TRƯỜNG HỢP 1A: Người dùng chọn Hồ sơ Online cụ thể
+        if ($chosenType === 'online') {
+          Log::info("🔍 [TRUY VẤN] Đang tìm kiếm Hồ sơ Online có ID: {$chosenId} của User: {$userId}");
+          $candidate = Candidate::with(['skills', 'category'])->where('user_id', $userId)->find($chosenId);
+
+          if ($candidate) {
+            Log::info("✅ [BÓC TÁCH SUCCESS] Tìm thấy Hồ sơ Online. Tiến hành trích xuất chữ...");
+            $skillsList = $candidate->skills ? $candidate->skills->pluck('name')->implode(', ') : '';
+            $categoryName = $candidate->category->name ?? 'Chưa phân loại';
+
+            $cvContentText = "Vị trí công việc: {$candidate->title}\n"
+              . "Ngành nghề: {$categoryName}\n"
+              . "Kỹ năng chuyên môn: {$skillsList}";
+          } else {
+            // 🔥 HÀNG RÀO PHÒNG THỦ: ID bị xóa lén ở DB hoặc tab khác
+            Log::warning("⚠️ [HÀNG RÀO PHÒNG THỦ] Hồ sơ Online ID [{$chosenId}] KHÔNG TỒN TẠI (Đã bị xóa). Kích hoạt chế độ Fallback!");
+          }
+        }
+
+        // TRƯỜNG HỢP 1B: Người dùng chọn File CV PDF cụ thể
+        if ($chosenType === 'uploaded' || $chosenType === 'upload') {
+          Log::info("🔍 [TRUY VẤN] Đang tìm kiếm File CV có ID: {$chosenId} của User: {$userId}");
+          $latestCv = CvFile::where('user_id', $userId)->where('type', 'uploaded')->find($chosenId);
+
+          if ($latestCv) {
+            Log::info("📂 [FILE CHECK] Tìm thấy bản ghi File CV trên Database. Kiểm tra file vật lý...");
+            $cvFullPath = public_path(ltrim($latestCv->file_path, '/'));
+
+            if (file_exists($cvFullPath)) {
+              Log::info("📝 [PARSING PDF] File vật lý hợp lệ. Đang dùng thư viện Smalot để đọc Text thô...");
+              $pdf = (new Parser())->parseFile($cvFullPath);
+              $cvContentText = $pdf->getText();
+              $chosenType = 'uploaded'; // Chuẩn hóa lại chữ 'upload' thành 'uploaded' đồng bộ với hệ thống
+            } else {
+              Log::warning("⚠️ [HÀNG RÀO PHÒNG THỦ] Bản ghi DB tồn tại nhưng File vật lý tại [{$cvFullPath}] đã bị xóa mất!");
+            }
+          } else {
+            // 🔥 HÀNG RÀO PHÒNG THỦ: ID file bị xóa lén ở DB hoặc tab khác
+            Log::warning("⚠️ [HÀNG RÀO PHÒNG THỦ] File CV ID [{$chosenId}] KHÔNG TỒN TẠI trên Database (Đã bị xóa). Kích hoạt chế độ Fallback!");
+          }
+        }
+      }
+
+      // =====================================================================
+      // LUỒNG 2: LUỒNG TỰ ĐỘNG (VÀO TRANG LẦN ĐẦU HOẶC CỨU CÁNH KHI LUỒNG 1 BỊ LỖI XÓA DATA)
+      // =====================================================================
+      if (empty(trim($cvContentText))) {
+        Log::info("📜 [LUỒNG 2] Kích hoạt cơ chế Tự động tìm kiếm (Ưu tiên: Online trước -> File PDF sau)");
+
+        // Bước 2.1: Thử bốc cái hồ sơ Online đầu tiên của user
+        $candidate = Candidate::with(['skills', 'category'])->where('user_id', $userId)->first();
 
         if ($candidate) {
-          Log::info("🔹 [AI] Đang bóc tách dữ liệu từ hồ sơ Online...");
+          Log::info("✨ [AUTO CHOSEN] Khớp thành công: Chọn Hồ sơ Online mặc định (ID thực tế: {$candidate->id})");
           $skillsList = $candidate->skills ? $candidate->skills->pluck('name')->implode(', ') : '';
           $categoryName = $candidate->category->name ?? 'Chưa phân loại';
+
           $cvContentText = "Vị trí công việc: {$candidate->title}\n"
             . "Ngành nghề: {$categoryName}\n"
             . "Kỹ năng chuyên môn: {$skillsList}";
-          Log::info($cvContentText);
+
+          // Đồng bộ lại thông tin thực tế để gán key Cache và phản hồi cho Frontend
+          $chosenType = 'online';
+          $chosenId = $candidate->id;
+        } else {
+          Log::info("ℹ️ User không có hồ sơ Online. Chuyển sang tìm kiếm File PDF...");
+
+          // Bước 2.2: Nếu không có Online, bốc file PDF mới nhất tải lên
+          $latestCv = CvFile::where('user_id', $userId)->where('type', 'uploaded')->latest()->first();
+
+          if ($latestCv) {
+            Log::info("✨ [AUTO CHOSEN] Khớp thành công: Chọn File PDF mới nhất (ID thực tế: {$latestCv->id})");
+            $cvFullPath = public_path(ltrim($latestCv->file_path, '/'));
+
+            if (file_exists($cvFullPath)) {
+              $pdf = (new Parser())->parseFile($cvFullPath);
+              $cvContentText = $pdf->getText();
+
+              // Đồng bộ lại thông tin thực tế
+              $chosenType = 'uploaded';
+              $chosenId = $latestCv->id;
+            } else {
+              Log::error("❌ File PDF vật lý của luồng Auto cũng không tồn tại trên ổ cứng.");
+            }
+          }
         }
       }
 
-      // TRƯỜNG HỢP 2: Chọn File CV cụ thể HOẶC Hệ thống tự động chuyển sang File vì không có Online
-      if (empty($cvContentText)) {
-        $query = CvFile::where('user_id', $userId)->where('type', 'uploaded');
-        $latestCv = ($chosenId && $chosenType === 'upload') ? $query->find($chosenId) : $query->latest()->first();
-
-        if (!$latestCv) {
-          return response()->json(['success' => false, 'message' => 'Vui lòng tạo hồ sơ online hoặc tải lên CV để bắt đầu!'], 400);
-        }
-
-        $cvFullPath = public_path(ltrim($latestCv->file_path, '/')); // lấy đừng đẫn cuar file cv
-        if (!file_exists($cvFullPath)) {
-          return response()->json(['success' => false, 'message' => 'File CV vật lý không tồn tại trên hệ thống.'], 500);
-        }
-
-        // Đọc file PDF
-        $pdf = (new Parser())->parseFile($cvFullPath); // laravel dùng thư viện Smalot để đọc file cv hệ thống lấy đc
-        $cvContentText = $pdf->getText(); // chuyển dữ liệu sáng text thô
-        // Log::info($cvContentText);
-      }
-
+      // BIỆN PHÁP CHẶN CUỐI CÙNG: Nếu duyệt cả 2 luồng rồi mà vẫn trống rỗng (User hoàn toàn chưa tạo gì)
       if (empty(trim($cvContentText))) {
-        return response()->json(['success' => false, 'message' => 'Nội dung hồ sơ trống, không thể phân tích.'], 400);
+        Log::warning("🛑 [STOP] Hệ thống dừng lại vì User ID [{$userId}] trống rỗng toàn bộ dữ liệu hồ sơ.");
+        return response()->json([
+          'success' => false,
+          'message' => 'Vui lòng tạo ít nhất một hồ sơ online hoặc tải lên một file CV để hệ thống có dữ liệu phân tích!'
+        ], 400);
       }
 
-      /* BƯỚC 2: TẠO "VÂN TAY KÉP" KIỂM TRA TRẠNG THÁI HỆ 
-        ở bước này hệ thống sẽ kiểu tra file cv đã đc phân tích gắn cho dữ liệu của nó 1 cái mã dựa trên hàm md5
-        trước khi cho AI phân tích khi mà người dùng muốn xem gợi ý AI thì hệ thống sẽ kiểm tra xem user này AI đã phân tích hay  
-        chưa, nếu rồi thì sẽ trả về dữ liệu phân tích củ, nếu chưa ms sang bước tiếp theo. 
-      */
-
+      // =====================================================================
+      // BƯỚC 2: TẠO "VÂN TAY KÉP" KIỂM TRA TRẠNG THÁI CACHE HỆ THỐNG
+      // =====================================================================
       // 1. Lấy ID lớn nhất của Job đang tuyển trong hệ thống
       $maxJobId = Job::where('status', 'active')->max('id') ?? 0;
 
-      // 2. Mã hóa MD5 nội dung CV hiện tại
+      // 2. Mã hóa MD5 nội dung văn bản CV
       $cvMd5 = md5(trim($cvContentText));
 
       // 3. Tạo vân tay tổng hợp đại diện cho trạng thái hiện tại
       $currentSystemFingerprint = "cv_{$cvMd5}_maxjob_{$maxJobId}";
 
-      $cacheFingerprintKey = "user_ai_fingerprint_" . $userId;
-      $cacheResultKey = "user_ai_jobs_result_" . $userId;
+      // Tách biệt các hộp chứa Cache động theo đúng ID thực tế của từng thực thể
+      $cacheFingerprintKey = "user_ai_fingerprint_{$userId}_{$chosenType}_{$chosenId}";
+      $cacheResultKey = "user_ai_jobs_result_{$userId}_{$chosenType}_{$chosenId}";
 
-      // KIỂM TRA: Nếu vân tay trùng khớp hoàn toàn (CV không đổi và Không có Job mới)
+      Log::info("🔒 [FINGERPRINT GENERATED] Mã định danh hiện tại: {$currentSystemFingerprint}");
+      Log::info("🗝️ [CACHE KEYS USED] Key Fingerprint: [{$cacheFingerprintKey}] | Key Result: [{$cacheResultKey}]");
+
+      // KIỂM TRA: Nếu vân tay trùng khớp hoàn toàn (CV giữ nguyên nội dung và không có Job mới đăng thêm)
       if (Cache::has($cacheFingerprintKey) && Cache::get($cacheFingerprintKey) === $currentSystemFingerprint) {
         if (Cache::has($cacheResultKey)) {
-          Log::info("🎯 [TOKEN SAVED] Trả về kết quả từ Cache (Tốn 0 Token AI)!");
+          Log::info("⚡⚡⚡ [AI CACHE HIT] Trùng khớp vân tay! Trả kết quả lưu tạm, KHÔNG GỌI API GEMINI.");
+          Log::info("=====================================================================");
+
           return response()->json([
             'success' => true,
             'data' => Cache::get($cacheResultKey),
-            'message' => 'Dữ liệu được tải từ bộ nhớ tạm thành công.'
+            'analyzed_type' => $chosenType,
+            'analyzed_id' => $chosenId,
+            'message' => 'Dữ liệu tải nhanh từ bộ nhớ đệm hệ thống.'
           ], 200);
         }
       }
 
-      // Nếu vân tay lệch -> Tiến hành gọi AI phân tích mới
-      Log::info("🚀 [AI TRIGGERED] Phát hiện biến động (Sửa CV/Đổi CV/Có Job mới). Gọi Gemini AI...");
+      // Nếu vân tay lệch -> Tiến hành kích hoạt Gemini AI để tính điểm mới
+      Log::info("🚀 [AI TRIGGERED] Vân tay không trùng khớp (Hoặc chưa từng quét). Bắt đầu gọi Gemini AI...");
 
       // BƯỚC 3: LẤY DANH SÁCH JOB LỌC THÔ
       $jobs = Job::with(['category', 'skills'])->where('status', 'active')->latest()->take(20)->get();
       if ($jobs->isEmpty()) {
+        Log::info("📭 Hệ thống đang không có bất kỳ Job tuyển dụng nào hoạt động.");
         return response()->json(['success' => true, 'data' => []], 200);
       }
 
-      // lưu job vào mảng để đưa AI phân tích 
+      // Gom dữ liệu Job gửi đi tối ưu Token
       $jobsDataForAI = [];
       foreach ($jobs as $job) {
         $jobsDataForAI[] = [
@@ -125,7 +197,6 @@ class AIController extends Controller
       }
 
       // BƯỚC 4: TRAIN CHO AI & GỌI GEMINI API
-      // Thuật toán so khớp: title*30% + category*20% + skill*50% 
       $systemInstruction = "Bạn là một thuật toán logic toán học được tích hợp trong hệ thống ATS.\n"
         . "Nhiệm vụ của bạn là tính toán điểm số phù hợp (matching_score) từ 0.00 đến 100.00 giữa CV của ứng viên với DANH SÁCH các công việc được cung cấp.\n\n"
         . "CÔNG THỨC VÀ QUY TẮC CHẤM ĐIỂM CHI TIẾT CHO TỪNG JOB:\n"
@@ -155,7 +226,10 @@ class AIController extends Controller
 
       $prompt = "Nội dung hồ sơ ứng viên:\n{$cvContentText}\n\n"
         . "Danh sách các công việc cần chấm điểm (Dạng JSON):\n" . json_encode($jobsDataForAI, JSON_UNESCAPED_UNICODE);
+
       $geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" . env('GEMINI_API_KEY');
+
+      Log::info("🌐 [API HTTP CALL] Đang tạo Request gửi tới Google Gemini API...");
       $response = Http::withHeaders(['Content-Type' => 'application/json'])
         ->post($geminiUrl, [
           'contents' => [['parts' => [['text' => $prompt]]]],
@@ -164,6 +238,7 @@ class AIController extends Controller
         ]);
 
       if ($response->successful()) {
+        Log::info("🎉 [API HTTP SUCCESS] Google Gemini trả kết quả về thành công!");
         $aiTextResponse = $response->json()['candidates'][0]['content']['parts'][0]['text'];
         $scoresList = json_decode($aiTextResponse, true) ?? [];
 
@@ -182,33 +257,37 @@ class AIController extends Controller
           $aiScore = $scoreMap[$job->id]['matching_score'] ?? 0;
           $aiReason = $scoreMap[$job->id]['reason'] ?? 'Chưa có đánh giá chi tiết.';
 
-          if ($aiScore >= 10) {// lấy job có điểm >= n 
+          if ($aiScore >= 10) { // Bộ lọc thô lấy các job có điểm lớn hơn hoặc bằng 10
             $job->matching_score = $aiScore;
             $job->ai_reason = $aiReason;
             $recommendedJobs[] = $job;
           }
         }
 
-        // Sắp xếp điểm số từ cao xuống thấp
+        // Sắp xếp mảng kết quả theo điểm số giảm dần
         $recommendedJobs = collect($recommendedJobs)->sortByDesc('matching_score')->values()->all();
 
-        // BƯỚC 5: CẬP NHẬT LẠI KẾT QUẢ VÀ VÂN TAY VÀO CACHE
-        // Lưu job phân tích đc hạn lyyw trong vòng 7 ngày
+        // BƯỚC 5: LƯU TRỮ VÂN TAY VÀ DỮ LIỆU MỚI VÀO BỘ NHỚ ĐỆM (Hạn lưu 7 ngày)
         Cache::put($cacheFingerprintKey, $currentSystemFingerprint, now()->addDays(7));
         Cache::put($cacheResultKey, $recommendedJobs, now()->addDays(7));
 
-        Log::info("✅ [AI SUCCESS] Đã lưu kết quả mới và cập nhật vân tay hệ thống.");
-        Log::info("====================================================");
+        Log::info("💾 [CACHE SAVED] Đã đóng gói lưu kết quả mới và đóng dấu vân tay hệ thống.");
+        Log::info("=====================================================================");
 
-        return response()->json(['success' => true, 'data' => $recommendedJobs], 200);
+        return response()->json([
+          'success' => true,
+          'data' => $recommendedJobs,
+          'analyzed_type' => $chosenType,
+          'analyzed_id' => $chosenId
+        ], 200);
       } else {
-        Log::error("❌ [AI] Lỗi API Gemini: " . $response->body());
-        return response()->json(['success' => false, 'message' => 'Lỗi kết nối bộ não AI.'], 500);
+        Log::error("❌ [AI API ERROR] Google Gemini từ chối xử lý: " . $response->body());
+        return response()->json(['success' => false, 'message' => 'Hệ thống AI đang quá tải, vui lòng thử lại sau!'], 500);
       }
 
     } catch (\Exception $e) {
-      Log::error("❌ [AI] Khởi động thất bại: " . $e->getMessage());
-      return response()->json(['success' => false, 'message' => 'Sự cố: ' . $e->getMessage()], 500);
+      Log::error("❌ [AI ATS CRITICAL EXCEPTION] Sự cố hệ thống nghiêm trọng: " . $e->getMessage());
+      return response()->json(['success' => false, 'message' => 'Gặp sự cố khi bóc tách dữ liệu: ' . $e->getMessage()], 500);
     }
   }
 
@@ -249,11 +328,11 @@ class AIController extends Controller
     // vòng lặp đưa danh sách cv uploaded vào mãng
     foreach ($uploadedCvs as $cv) {
       // Lấy tên file gốc từ đường dẫn
-      $fileName = basename($cv->file_path);
+      //$fileName = basename($cv->file_path);
 
       $cvList[] = [
         'id' => 'cv-upload-' . $cv->id,
-        'name' => '📄 File: ' . $fileName,
+        'name' => '📄 File: ' . $cv->file_name,
         'type' => 'upload',
         'cvId' => $cv->id
       ];

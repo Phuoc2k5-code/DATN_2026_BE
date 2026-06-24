@@ -53,7 +53,7 @@ Route::middleware('auth:sanctum')->group(function(){
     Route::post('/cv-management/updateCvTemplate/{id}', [CandidateController::class, 'updateCVTemplate']);
     //--- upload Cv
     Route::post('/cv-management/upload-cv', [CVFileController::class, 'uploadCV']);
-    Route::delete('/cv-management/destroy-file', [CVFileController::class, 'destroyFile']);
+    Route::delete('/cv-management/destroy-file/{id}', [CVFileController::class, 'destroyFile']);
     Route::get('/cv-management/download-cv', [CVFileController::class, 'downloadAndSaveCV']);
     Route::get('/cv-management/download-cv/{id}', [CVFileController::class, 'downloadAndSaveCV']);
     // --- ứng tuyển nhanh
