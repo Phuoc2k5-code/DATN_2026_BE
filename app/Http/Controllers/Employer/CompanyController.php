@@ -85,50 +85,54 @@ class CompanyController extends Controller
             'data' => $company
         ], 200);
     }
-      public function getOwnCompanyJobs(Request $request)
+     public function getOwnCompanyJobs(Request $request)
     {
-    $user = $request->user(); 
-    if (!$user) {
-        return response()->json(['success' => false, 'message' => 'Phiên đăng nhập đã hết hạn.'], 401);
-    }
+        $user = $request->user(); 
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Phiên đăng nhập đã hết hạn.'], 401);
+        }
 
-    $company = Company::where('user_id', $user->id)->first();
-    if (!$company) {
-        return response()->json(['success' => false, 'message' => 'Chưa cấu hình thông tin doanh nghiệp.'], 404);
-    }
+        $company = Company::where('user_id', $user->id)->first();
+        if (!$company) {
+            return response()->json(['success' => false, 'message' => 'Chưa cấu hình thông tin doanh nghiệp.'], 404);
+        }
 
-    $jobs = Job::where('company_id', $company->id)
-        ->leftJoin('categories', 'jobs.category_id', '=', 'categories.id')
-        
-        // Cú pháp chọn lấy mọi cột của jobs và lấy tên category
-        ->select('jobs.*', 'categories.name as category_name')
-        
-        // 1. Format lại ngày hết hạn
-        ->selectRaw('DATE_FORMAT(jobs.expired_at, "%d/%m/%Y") as deadline')
-        
-        // 2. Tự động phiên dịch Trạng thái từ Database (Tiếng Anh -> Tiếng Việt)
-        ->selectRaw('
-            CASE 
-                WHEN jobs.status = "active" THEN "Vận hành"
-                WHEN jobs.status = "closed" THEN "Tạm đóng"
-                WHEN jobs.status = "pending" THEN "Chờ duyệt"
-                ELSE jobs.status 
-            END as status
-        ')
-        
-        // 3. Đếm tổng lượt xem
-        ->selectRaw('(SELECT COALESCE(SUM(click_count), 0) FROM job_clicks WHERE job_clicks.job_id = jobs.id) as views')
-        
-        // 4. Đếm tổng số lượng CV nộp vào
-        ->selectRaw('(SELECT COUNT(*) FROM applications WHERE applications.job_id = jobs.id) as applicants')
-        
-        ->orderBy('jobs.created_at', 'desc')
-        ->get();
+        // SỬA ĐỔI: Sử dụng Model Job kết hợp với `with('skills')` để lấy kèm kỹ năng
+        $jobs = Job::where('company_id', $company->id)
+            ->with(['skills' => function($query) {
+                $query->select('skills.id', 'skills.name'); // Chỉ lấy id và name kỹ năng cho nhẹ dữ liệu
+            }])
+            ->leftJoin('categories', 'jobs.category_id', '=', 'categories.id')
+            
+            // Cú pháp chọn lấy mọi cột của jobs và lấy tên category
+            ->select('jobs.*', 'categories.name as category_name')
+            
+            // 1. Format lại ngày hết hạn
+            ->selectRaw('DATE_FORMAT(jobs.expired_at, "%d/%m/%Y") as deadline')
+            
+            // 2. Tự động phiên dịch Trạng thái từ Database (Tiếng Anh -> Tiếng Việt)
+            ->selectRaw('
+                CASE 
+                    WHEN jobs.status = "active" THEN "Vận hành"
+                    WHEN jobs.status = "closed" THEN "Tạm đóng"
+                    WHEN jobs.status = "pending" THEN "Chờ duyệt"
+                    ELSE jobs.status 
+                END as status
+            ')
+            
+            // 3. Đếm tổng lượt xem
+            ->selectRaw('(SELECT COALESCE(SUM(click_count), 0) FROM job_clicks WHERE job_clicks.job_id = jobs.id) as views')
+            
+            // 4. Đếm tổng số lượng CV nộp vào
+            ->selectRaw('(SELECT COUNT(*) FROM applications WHERE applications.job_id = jobs.id) as applicants')
+            
+            ->orderBy('jobs.created_at', 'desc')
+            ->get();
 
-    return response()->json([
-        'success' => true,
-        'data' => $jobs
-    ], 200);
+        return response()->json([
+            'success' => true,
+            'data' => $jobs
+        ], 200);
     }
         public function toggleJobStatus(Request $request, $id)
     {
@@ -197,7 +201,7 @@ class CompanyController extends Controller
             'message' => 'Gia hạn thành công! Tin đã được cập nhật.'
         ], 200);
     }
-        public function storeJob(Request $request)
+    public function storeJob(Request $request)
     {
         // Xác thực người dùng và công ty
         $user = $request->user();
@@ -206,7 +210,7 @@ class CompanyController extends Controller
         $company = Company::where('user_id', $user->id)->first();
         if (!$company) return response()->json(['success' => false, 'message' => 'Chưa cấu hình công ty.'], 404);
 
-        // Kiểm tra dữ liệu Form gửi lên
+        // Bổ sung luật kiểm tra mảng 'skills' gửi lên từ React
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'category_id' => 'required|integer',
@@ -219,6 +223,12 @@ class CompanyController extends Controller
             'requirements' => 'required|string',
             'benefits' => 'nullable|string',
             'expired_at' => 'required|date|after:today',
+            'skills' => 'required|array', // Bắt buộc phải có thuộc tính skills và phải là mảng
+            'skills.*' => 'integer|exists:skills,id', // Từng phần tử trong mảng phải là ID số nguyên tồn tại ở bảng skills
+        ], [
+            
+            'skills.required' => 'Vui lòng lựa chọn ít nhất một kỹ năng chuyên môn yêu cầu.',
+            'skills.array' => 'Dữ liệu kỹ năng không đúng định dạng mảng.',
         ]);
 
         // Tạo bản ghi mới trong bảng jobs
@@ -238,6 +248,11 @@ class CompanyController extends Controller
         $job->status = 'pending'; // Tin mới đăng tự động đưa vào trạng thái Chờ duyệt
         $job->save();
 
+        // Tiến hành đồng bộ mảng ID kỹ năng vào bảng trung gian sau khi $job đã lưu thành công
+        if (!empty($validated['skills'])) {
+            $job->skills()->sync($validated['skills']);
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Đăng tin thành công! Vui lòng chờ Quản trị viên phê duyệt.'
@@ -255,7 +270,7 @@ class CompanyController extends Controller
         $job = Job::where('id', $id)->where('company_id', $company->id)->first();
         if (!$job) return response()->json(['success' => false, 'message' => 'Không tìm thấy tin tuyển dụng.'], 404);
 
-        // Kiểm tra dữ liệu (Không cần validate expired_at vì mình đã có chức năng Gia hạn riêng)
+        // 1. CẬP NHẬT: Thêm điều kiện validate cho mảng skills gửi lên từ React
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'category_id' => 'required|integer',
@@ -267,9 +282,11 @@ class CompanyController extends Controller
             'description' => 'required|string',
             'requirements' => 'required|string',
             'benefits' => 'nullable|string',
+            'skills' => 'required|array', // Bắt buộc gửi lên dạng mảng
+            'skills.*' => 'integer|exists:skills,id', // Từng ID phải tồn tại trong bảng skills
         ]);
 
-        // Cập nhật dữ liệu
+        // Cập nhật dữ liệu cơ bản
         $job->category_id = $validated['category_id'];
         $job->title = $validated['title'];
         $job->level = $validated['level'];
@@ -281,15 +298,37 @@ class CompanyController extends Controller
         $job->requirements = $validated['requirements'];
         $job->benefits = $validated['benefits'] ?? null;
         
-        // ĐIỂM QUAN TRỌNG: Đổi trạng thái về chờ duyệt để Admin kiểm tra lại nội dung mới
+        // Đổi trạng thái về chờ duyệt để Admin kiểm tra lại nội dung mới
         $job->status = 'pending'; 
-
         $job->save();
+
+        // 2. CẬP NHẬT: Đồng bộ lại danh sách kỹ năng mới (Xóa liên kết cũ, nạp liên kết mới)
+        if (isset($validated['skills'])) {
+            $job->skills()->sync($validated['skills']);
+        }
 
         return response()->json([
             'success' => true,
             'message' => 'Cập nhật thành công! Tin của bạn đã được chuyển về trạng thái Chờ duyệt.'
         ], 200);
+    }
+    // Hàm lấy toàn bộ danh sách kỹ năng hệ thống trả về cho Frontend
+    public function getAllSkills()
+    {
+        try {
+            // Lấy ra tất cả kỹ năng gồm id và name từ bảng tuyển dụng
+            $skills = \App\Models\Skill::select('id', 'name')->orderBy('name', 'asc')->get();
+            
+            return response()->json([
+                'success' => true,
+                'data' => $skills
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Không thể tải danh sách kỹ năng: ' . $e->getMessage()
+            ], 500);
+        }
     }
        public function getCompanyCandidates(Request $request)
     {
