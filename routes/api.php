@@ -19,12 +19,22 @@ use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\SkillController;
 use App\Http\Controllers\Admin\SystemModerationController;
 use App\Http\Controllers\Admin\StatisticController;
+use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\Auth\ForgotPasswordController;
 use Illuminate\Support\Facades\DB;
 
 
 
 Route::post('/login-user', [LoginController::class, 'LoginUser']);
 Route::post('/login-admin', [LoginController::class, 'LoginAdmin']);
+
+Route::post('/register', [RegisterController::class, 'register']);
+Route::post('/verify-otp', [RegisterController::class, 'verifyOtp']);
+Route::post('/companies/register', [CompanyController::class, 'storeCompany']);
+
+Route::post('/forgot-password/send-otp', [ForgotPasswordController::class, 'sendResetOtp']);
+Route::post('/forgot-password/verify-otp', [ForgotPasswordController::class, 'verifyResetOtp']);
+Route::post('/forgot-password/reset', [ForgotPasswordController::class, 'resetPassword']);
 
 Route::get('/home', [HomeController::class, 'index']);
 Route::get('/job-detail/{id}', [HomeController::class, 'JobDetail']);
@@ -62,7 +72,7 @@ Route::middleware('auth:sanctum')->group(function(){
     
     //--- Upload Cv
     Route::post('/cv-management/upload-cv', [CVFileController::class, 'uploadCV']);
-    Route::delete('/cv-management/destroy-file', [CVFileController::class, 'destroyFile']);
+    Route::delete('/cv-management/destroy-file/{id}', [CVFileController::class, 'destroyFile']);
     Route::get('/cv-management/download-cv', [CVFileController::class, 'downloadAndSaveCV']);
     Route::get('/cv-management/download-cv/{id}', [CVFileController::class, 'downloadAndSaveCV']);
     

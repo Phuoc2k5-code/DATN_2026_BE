@@ -7,8 +7,10 @@ use Illuminate\Http\Request;
 use App\Models\Company;
 use App\Models\Job;
 use App\Models\Category;
+use App\Models\User;
 use Illuminate\Support\Facades\DB; 
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Validator;
 use App\Mail\ApplicationStatusChanged;
 
 class CompanyController extends Controller
@@ -644,5 +646,102 @@ class CompanyController extends Controller
                 'cvChartData' => $cvChartData,
             ]
         ], 200);
+    }
+
+    // hàm tạo thông tin công ty kèm upload logo
+    public function storeCompany(Request $request)
+    {
+        try {
+            // 1. Viết Validate trực tiếp (Bổ sung thêm trường logo)
+            $validator = Validator::make($request->all(), [
+                'email'            => 'required|email|exists:users,email',
+                'company_name'     => 'required|string|max:255',
+                'tax_code'         => 'required|string|max:50|unique:companies,tax_code',
+                'business_license' => 'nullable|string|max:255',
+                'website_url'      => 'nullable|url|max:255',
+                'description'      => 'nullable|string',
+                'industry'         => 'required|string|max:255',
+                'size'             => 'required|string|max:100', 
+                'founded_year'     => 'nullable|integer|min:1900|max:' . date('Y'),
+                'address'          => 'required|string|max:255',
+                'benefits'         => 'nullable|string',
+                'logo'             => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048', // Validate File ảnh max 2MB
+            ], [
+                'email.required'        => 'Không tìm thấy thông tin tài khoản vừa đăng ký.',
+                'email.exists'          => 'Tài khoản liên kết không tồn tại trên hệ thống.',
+                'company_name.required' => 'Tên công ty không được để trống.',
+                'tax_code.required'     => 'Mã số thuế không được để trống.',
+                'tax_code.unique'       => 'Mã số thuế này đã tồn tại trên hệ thống.',
+                'website_url.url'       => 'Định dạng đường dẫn Website không hợp lệ.',
+                'industry.required'     => 'Vui lòng nhập hoặc chọn ngành nghề kinh doanh.',
+                'size.required'         => 'Vui lòng chọn quy mô công ty.',
+                'address.required'      => 'Địa chỉ công ty không được để trống.',
+                'logo.image'            => 'File tải lên phải là định dạng hình ảnh.',
+                'logo.mimes'            => 'Logo chỉ chấp nhận các định dạng: jpeg, png, jpg, gif.',
+                'logo.max'              => 'Dung lượng logo không được vượt quá 2MB.',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'errors'  => $validator->errors()
+                ], 422);
+            }
+
+            // 2. Tìm User dựa vào Email được truyền lên từ Frontend
+            $user = User::where('email', $request->email)->first();
+
+            // 3. Kiểm tra xem tài khoản này đã từng tạo công ty chưa
+            $existingCompany = Company::where('user_id', $user->id)->first();
+            if ($existingCompany) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Hồ sơ công ty cho tài khoản này đã được tạo trước đó.'
+                ], 400);
+            }
+
+            // 4. Lấy dữ liệu hợp lệ và gán các trường hệ thống
+            $validatedData = $validator->validated();
+            
+            $validatedData['user_id'] = $user->id; 
+            $validatedData['is_verified'] = false; // Chờ Admin duyệt bài
+            $validatedData['reject_reason'] = '';
+
+            // 5. XỬ LÝ UPLOAD LOGO VÀO THƯ MỤC PUBLIC
+            if ($request->hasFile('logo')) {
+                $file = $request->file('logo');
+                // Tạo tên file duy nhất để tránh trùng lặp: ví dụ 171892102_logo.png
+                $fileName = time() . '_' . $file->getClientOriginalName();
+                
+                // Di chuyển file vào thư mục public/logoCompany
+                $file->move(public_path('logoCompany'), $fileName);
+                
+                // Lưu đường dẫn vào database để frontend gọi hiển thị
+                $validatedData['logo_url'] = 'logoCompany/' . $fileName;
+            } else {
+                // Nếu không upload ảnh, sử dụng ảnh mặc định của hệ thống
+                $validatedData['logo_url'] = 'logoCompany/logo-default.png';
+            }
+
+            // Loại bỏ các trường thừa không có trong bảng companies
+            unset($validatedData['email']);
+            unset($validatedData['logo']);
+
+            // 6. Tiến hành lưu dữ liệu
+            $company = Company::create($validatedData);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Cập nhật thông tin công ty và logo thành công! Vui lòng chờ kích hoạt.',
+                'data'    => $company
+            ], 201);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Đã xảy ra lỗi hệ thống nghiêm trọng.',
+                'error'   => $e->getMessage()
+            ], 500);
+        }
     }
 }
