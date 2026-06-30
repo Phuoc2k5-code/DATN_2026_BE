@@ -68,10 +68,10 @@ class HomeController extends Controller
 
       // Lọc theo khoảng Lương (Salary)
       if ($request->has('salary_from') && !empty($request->salary_from)) {
-        $query->where('salary', '>=', $request->salary_from); // Thay 'salary' bằng tên cột tương ứng
+        $query->where('salary_min', '>=', $request->salary_from); // Thay 'salary' bằng tên cột tương ứng
       }
       if ($request->has('salary_to') && !empty($request->salary_to)) {
-        $query->where('salary', '<=', $request->salary_to);
+        $query->where('salary_max', '<=', $request->salary_to);
       }
 
       // --- ĐOẠN DƯỚI GIỮ NGUYÊN HOÀN TOÀN ---

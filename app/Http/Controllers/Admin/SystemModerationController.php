@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Job;
 use App\Models\Company;
+use App\Models\User;
 
 class SystemModerationController extends Controller
 {
@@ -118,6 +119,10 @@ class SystemModerationController extends Controller
             'is_verified' => 2,
             'reject_reason' => $request->input('reason')
         ]);
+
+        $user = User::where('id', $company->user_id);
+
+        $user->delete();
 
         return response()->json(['success' => true, 'message' => 'Đã từ chối xác minh doanh nghiệp thành công!'], 200);
     }
