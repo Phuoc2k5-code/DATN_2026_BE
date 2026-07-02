@@ -21,6 +21,7 @@ class RegisterController extends Controller
     {
         // 1. Kiểm tra dữ liệu đầu vào (Validation)
         $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
             'password' => [
                 'required',
@@ -33,6 +34,8 @@ class RegisterController extends Controller
             ], // Đã sửa: Chỉ giữ lại 1 dấu phẩy hợp lệ ở đây
             'role' => 'required|in:employer,candidate',
         ], [
+            'name.required' => 'Tên không được để trống.',
+            'name.max' => 'Tên không được vượt quá 255 ký tự.',
             'email.required' => 'Email không được để trống.',
             'email.email' => 'Email không đúng định dạng.',
             'email.unique' => 'Email này đã được đăng ký trước đó.',
@@ -53,6 +56,7 @@ class RegisterController extends Controller
         try {
             // 2. Tạo User ở trạng thái chờ kích hoạt
             $user = User::create([
+                'name' => $request->name,
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
                 'role' => $request->role,

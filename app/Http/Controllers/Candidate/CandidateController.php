@@ -154,17 +154,77 @@ class CandidateController extends Controller
       'email' => 'required|email|max:255',
       'address' => 'nullable|string|max:255',
       'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-      'summary' => 'nullable|string',
+      'summary' => 'required|string',
       'objective' => 'nullable|string',
       'links' => 'nullable|array',
       'experience_years' => 'nullable|integer|min:0',
-      'project' => 'nullable|array',
+      'project' => 'required|array',
       'education' => 'nullable|string',
       'contact_reference' => 'nullable|array',
       'skills' => 'required|array',
       'skills.*.id' => 'required|exists:skills,id',
       'skills.*.level' => 'required|string|max:50'
-    ]);
+    ], [
+    'category_id.required' => 'Vui lòng chọn danh mục công việc/ngành nghề.',
+    'category_id.exists' => 'Danh mục công việc được chọn không tồn tại trong hệ thống.',
+    
+    'cv_template_id.exists' => 'Mẫu giao diện CV được chọn không hợp lệ.',
+    
+    'title.required' => 'Tiêu đề hồ sơ/CV không được để trống.',
+    'title.string' => 'Tiêu đề hồ sơ phải là một chuỗi ký tự.',
+    'title.max' => 'Tiêu đề hồ sơ không được vượt quá 100 ký tự.',
+    
+    'full_name.required' => 'Họ và tên không được để trống.',
+    'full_name.string' => 'Họ và tên phải là một chuỗi ký tự.',
+    'full_name.max' => 'Họ và tên không được vượt quá 255 ký tự.',
+    
+    'gender.required' => 'Vui lòng chọn giới tính.',
+    'gender.in' => 'Giới tính được chọn phải là Nam, Nữ hoặc Khác.',
+    
+    'birthday.date' => 'Ngày sinh không đúng định dạng ngày tháng.',
+    
+    'phone.required' => 'Số điện thoại không được để trống.',
+    'phone.string' => 'Số điện thoại phải là một chuỗi ký tự.',
+    'phone.max' => 'Số điện thoại không được vượt quá 20 ký tự.',
+    
+    'email.required' => 'Địa chỉ email không được để trống.',
+    'email.email' => 'Địa chỉ email không đúng định dạng.',
+    'email.max' => 'Địa chỉ email không được vượt quá 255 ký tự.',
+    
+    'address.string' => 'Địa chỉ phải là một chuỗi ký tự.',
+    'address.max' => 'Địa chỉ không được vượt quá 255 ký tự.',
+    
+    'avatar.image' => 'Tệp tải lên phải là một hình ảnh.',
+    'avatar.mimes' => 'Ảnh đại diện phải thuộc các định dạng: jpeg, png, jpg, gif.',
+    'avatar.max' => 'Dung lượng ảnh đại diện không được vượt quá 2MB (2048 KB).',
+    
+    'summary.required' => 'Phần tóm tắt bản thân không được để trống.',
+    'summary.string' => 'Tóm tắt bản thân phải là một chuỗi ký tự.',
+    
+    'objective.string' => 'Mục tiêu nghề nghiệp phải là một chuỗi ký tự.',
+    
+    'links.array' => 'Danh sách liên kết mạng xã hội phải là một mảng dữ liệu.',
+    
+    'experience_years.integer' => 'Số năm kinh nghiệm phải là số nguyên.',
+    'experience_years.min' => 'Số năm kinh nghiệm không được nhỏ hơn 0.',
+    
+    'project.required' => 'Thông tin dự án không được để trống.',
+    'project.array' => 'Danh sách dự án phải là một mảng dữ liệu.',
+    
+    'education.string' => 'Thông tin học vấn phải là một chuỗi ký tự.',
+    
+    'contact_reference.array' => 'Thông tin người tham chiếu phải là một mảng dữ liệu.',
+    
+    'skills.required' => 'Vui lòng bổ sung ít nhất một kỹ năng.',
+    'skills.array' => 'Danh sách kỹ năng phải là một mảng dữ liệu.',
+    
+    'skills.*.id.required' => 'Mã định danh của kỹ năng là bắt buộc.',
+    'skills.*.id.exists' => 'Kỹ năng được lựa chọn không tồn tại trên hệ thống.',
+    
+    'skills.*.level.required' => 'Mức độ thông thạo của kỹ năng là bắt buộc.',
+    'skills.*.level.string' => 'Mức độ kỹ năng phải là một chuỗi ký tự.',
+    'skills.*.level.max' => 'Mức độ kỹ năng không được vượt quá 50 ký tự.',
+  ]);
 
     if ($validator->fails()) {
       return response()->json(['success' => false, 'errors' => $validator->errors()], 422);

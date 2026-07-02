@@ -37,7 +37,7 @@ class UserController extends Controller
 
       // 🚀 SỬA TỪ ĐÂY: KHÔNG TỰ ĐỘNG CREATE NỮA!
       // Chỉ lấy dữ liệu ra thôi, có thì dùng, không có thì trả về null
-      $data = User::select('id', 'email', 'role', 'status')
+      $data = User::select('id', 'name', 'email', 'role', 'status')
         ->with([
           'candidate' => function ($query) {
             $query->select('id', 'user_id', 'cv_template_id', 'category_id', 'title', 'full_name', 'gender', 'birthday', 'phone', 'email', 'address', 'avatar_url');
@@ -61,100 +61,112 @@ class UserController extends Controller
 
   // Hàm sửa thông tin tài khoản & upload Avatar
   public function updateProfile(Request $request)
-  {
-    // 1. Kiểm tra Validate dữ liệu đầu vào (Bổ sung validate cho trường avatar)
+{
+    // 1. Kiểm tra Validate dữ liệu đầu vào
     $validator = Validator::make($request->all(), [
-      'full_name' => 'required|string|max:255',
-      'phone' => 'nullable|string|max:15',
-      'title' => 'nullable|string|max:255',
-      'address' => 'nullable|string|max:255',
-      'birthday' => 'nullable|date|before:today',
-      'gender' => 'nullable|string|max:10',
-      'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120', // 💡 ĐÃ THÊM: Cho phép tối đa 5MB
+        'full_name' => 'required|string|max:255', // Dùng để cập nhật cho cả user và candidate
+        'phone' => 'nullable|string|max:15',
+        'title' => 'nullable|string|max:255',
+        'address' => 'nullable|string|max:255',
+        'birthday' => 'nullable|date|before:today',
+        'gender' => 'nullable|string|max:10',
+        'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120', 
     ], [
-      'full_name.required' => 'Họ và tên không được để trống.',
-      'birthday.date' => 'Ngày sinh không đúng định dạng.',
-      'birthday.before' => 'Ngày sinh phải là một ngày trong quá khứ.',
-      'avatar.image' => 'Tệp tải lên phải là hình ảnh.',
-      'avatar.mimes' => 'Ảnh đại diện chỉ chấp nhận định dạng jpeg, png, jpg, gif.',
-      'avatar.max' => 'Dung lượng ảnh đại diện không được vượt quá 5MB.',
+        'full_name.required' => 'Họ và tên không được để trống.',
+        'birthday.date' => 'Ngày sinh không đúng định dạng.',
+        'birthday.before' => 'Ngày sinh phải là một ngày trong quá khứ.',
+        'avatar.image' => 'Tệp tải lên phải là hình ảnh.',
+        'avatar.mimes' => 'Ảnh đại diện chỉ chấp nhận định dạng jpeg, png, jpg, gif.',
+        'avatar.max' => 'Dung lượng ảnh đại diện không được vượt quá 5MB.',
     ]);
 
     // Nếu Validate thất bại, trả về lỗi 422
     if ($validator->fails()) {
-      return response()->json([
-        'success' => false,
-        'message' => $validator->errors()->first(),
-        'errors' => $validator->errors()
-      ], 422);
+        return response()->json([
+            'success' => false,
+            'message' => $validator->errors()->first(),
+            'errors' => $validator->errors()
+        ], 422);
     }
 
-    // 2. Lấy thông tin Candidate thông qua tài khoản đang đăng nhập
+    // 2. Lấy thông tin User và Candidate đang đăng nhập
     $user = Auth::user();
     $candidate = $user->candidate;
 
     if (!$candidate) {
-      return response()->json([
-        'success' => false,
-        'message' => 'Hồ sơ ứng viên không tồn tại trong hệ thống.'
-      ], 404);
+        return response()->json([
+            'success' => false,
+            'message' => 'Hồ sơ ứng viên không tồn tại trong hệ thống.'
+        ], 404);
     }
 
-    // Mảng dữ liệu cập nhật ban đầu
-    $updateData = [
-      'full_name' => $request->input('full_name'),
-      'phone' => $request->input('phone'),
-      'title' => $request->input('title'),
-      'address' => $request->input('address'),
-      'birthday' => $request->input('birthday') ? $request->input('birthday') : null,
-      'gender' => $request->input('gender'),
+    // Mảng dữ liệu cập nhật cho bảng 'candidates'
+    $updateCandidateData = [
+        'full_name' => $request->input('full_name'),
+        'phone' => $request->input('phone'),
+        'title' => $request->input('title'),
+        'address' => $request->input('address'),
+        'birthday' => $request->input('birthday') ? $request->input('birthday') : null,
+        'gender' => $request->input('gender'),
     ];
 
-    // 3. 💡 XỬ LÝ UPLOAD AVATAR & TỐI ƯU BỘ NHỚ (XÓA FILE CŨ)
+    // 3. XỬ LÝ UPLOAD AVATAR & TỐI ƯU BỘ NHỚ
     if ($request->hasFile('avatar')) {
-      // Bước A: Kiểm tra và xóa file ảnh cũ để tránh rác bộ nhớ server
-      if (!empty($candidate->avatar_url)) {
-        // Xác định đường dẫn tuyệt đối của file cũ trong thư mục public
-        $oldImagePath = public_path($candidate->avatar_url);
-
-        // Ràng buộc bảo vệ: Chỉ xóa nếu file cũ tồn tại VÀ đó không phải là file ảnh mặc định hệ thống
-        if (File::exists($oldImagePath) && !Str::contains($candidate->avatar_url, 'default-avatar.png')) {
-          File::delete($oldImagePath); // Tiến hành xóa file cũ khỏi server
+        if (!empty($candidate->avatar_url)) {
+            $oldImagePath = public_path($candidate->avatar_url);
+            if (File::exists($oldImagePath) && !Str::contains($candidate->avatar_url, 'default-avatar.png')) {
+                File::delete($oldImagePath); 
+            }
         }
-      }
 
-      // Bước B: Tiến hành lưu file ảnh mới
-      $file = $request->file('avatar');
+        $file = $request->file('avatar');
+        $fileName = 'avatar_' . $user->id . '_' . time() . '.' . $file->getClientOriginalExtension();
+        $destinationPath = public_path('avatars');
 
-      // Tạo tên file độc nhất bằng chuỗi ngẫu nhiên + thời gian tránh bị trùng lặp đè file
-      $fileName = 'avatar_' . $user->id . '_' . time() . '.' . $file->getClientOriginalExtension();
+        if (!File::exists($destinationPath)) {
+            File::makeDirectory($destinationPath, 0755, true, true);
+        }
 
-      // Định nghĩa thư mục đích: public/uploads/avatars
-      $destinationPath = public_path('avatars');
-
-      // Nếu thư mục chưa tồn tại thì tự động tạo mới thư mục với quyền ghi (0755)
-      if (!File::exists($destinationPath)) {
-        File::makeDirectory($destinationPath, 0755, true, true);
-      }
-
-      // Di chuyển file từ thư mục tạm của PHP sang thư mục public của Laravel
-      $file->move($destinationPath, $fileName);
-
-      // Gán đường dẫn tương đối vào mảng để chuẩn bị lưu vào Database
-      $updateData['avatar_url'] = 'avatars/' . $fileName;
+        $file->move($destinationPath, $fileName);
+        $updateCandidateData['avatar_url'] = 'avatars/' . $fileName;
     }
 
-    // 4. Tiến hành cập nhật dữ liệu vào bảng 'candidates' trong DB
-    $candidate->update($updateData);
+    // 4. SỬ DỤNG TRANSACTION ĐỂ CẬP NHẬT ĐỒNG THỜI CẢ 2 BẢNG (USERS & CANDIDATES)
+    \DB::beginTransaction();
+    try {
+        // Cập nhật trường name ở bảng users
+        $user->update([
+            'name' => $request->input('full_name')
+        ]);
 
-    // 5. Trả về thông báo thành công và dữ liệu mới nhất (bao gồm avatar_url mới để ReactJS đồng bộ)
-    return response()->json([
-      'success' => true,
-      'message' => 'Cập nhật thông tin hồ sơ và ảnh đại diện thành công!',
-      'data' => [
-        'avatar_url' => $candidate->avatar_url
-      ]
-    ], 200);
+        // Cập nhật thông tin ở bảng candidates
+        $candidate->update($updateCandidateData);
+
+        DB::commit(); // Xác nhận lưu thay đổi thành công vào DB
+
+        // 5. Trả về thông báo thành công và dữ liệu mới nhất
+        return response()->json([
+            'success' => true,
+            'message' => 'Cập nhật thông tin tài khoản và ảnh đại diện thành công!',
+            'data' => [
+                'name' => $user->name,
+                'avatar_url' => $candidate->avatar_url
+            ]
+        ], 200);
+
+    } catch (\Exception $e) {
+        DB::rollBack(); // Hoàn tác nếu có bất kỳ lỗi nào xảy ra trong quá trình update DB
+
+        // Nếu có upload avatar mới mà DB lỗi thì nên xóa file vừa upload để tránh file rác
+        if (isset($fileName) && File::exists(public_path('avatars/' . $fileName))) {
+            File::delete(public_path('avatars/' . $fileName));
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Lỗi cập nhật hệ thống: ' . $e->getMessage()
+        ], 500);
+    }
   }
 
   //Hàm đổi mật khẩu 
