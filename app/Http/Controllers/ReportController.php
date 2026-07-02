@@ -21,7 +21,7 @@ class ReportController extends Controller
     $validator = Validator::make($request->all(), [
       'id' => 'required|integer',
       'type' => 'required|string|in:job,company',
-      'reason_type' => 'required|string|in:fraud,wrong_info,expired,fake_company,bad_behavior,other',
+      'reason_type' => 'required|string',
       'description' => 'nullable|string|max:1000',
     ], [
       'id.required' => 'Thiếu ID đối tượng cần báo cáo.',
