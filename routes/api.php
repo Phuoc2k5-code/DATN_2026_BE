@@ -153,4 +153,6 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
 
     // --- Báo cáo thống kê số liệu
     Route::get('/statistics', [StatisticController::class, 'getStatistics']);
+
+   
 });
