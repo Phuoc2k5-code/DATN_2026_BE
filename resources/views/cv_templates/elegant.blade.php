@@ -401,26 +401,23 @@
 
     <!-- Khối giới thiệu & Mục tiêu nghề nghiệp -->
     <table class="intro-table" cellpadding="0" cellspacing="0">
-      <tr>
-        <td class="intro-left">
-          <div class="section-title" style="margin-top: 0;">Giới thiệu bản thân</div>
-          <div class="text-justify whitespace-pre-line" style="margin: 0 0 4px 0; line-height: 1.3;">
-            {{ $candidate->summary }}</div>
+  <tr>
+    <td class="intro-left">
+      <div class="section-title" style="margin-top: 0;">Giới thiệu bản thân</div>
+      <div class="text-left whitespace-pre-line" style="margin: 0 0 4px 0; line-height: 1.3;">{{ $candidate->summary }}</div>
 
-          @if($candidate->objective)
-            <div class="whitespace-pre-line" style="margin: 4px 0 0 0; line-height: 1.3; text-align: left;">
-              <span style="font-weight: bold; color: #1e293b;">Mục tiêu sự nghiệp:</span> {{ $candidate->objective }}
-            </div>
-          @endif
-        </td>
-        <td class="intro-right">
-          <div class="experience-box">
-            <div class="exp-number">{{ $candidate->experience_years ?? 0 }}</div>
-            <div class="exp-label">Năm Kinh Nghiệm</div>
-          </div>
-        </td>
-      </tr>
-    </table>
+      @if($candidate->objective)
+        <div class="whitespace-pre-line" style="margin: 4px 0 0 0; line-height: 1.3; text-align: left;"><span style="font-weight: bold; color: #1e293b;">Mục tiêu sự nghiệp:</span> {{ $candidate->objective }}</div>
+      @endif
+    </td>
+    <td class="intro-right">
+      <div class="experience-box">
+        <div class="exp-number">{{ $candidate->experience_years ?? 0 }}</div>
+        <div class="exp-label">Năm Kinh Nghiệm</div>
+      </div>
+    </td>
+  </tr>
+</table>
 
     <!-- 💼 KINH NGHIỆM LÀM VIỆC & DỰ ÁN THỰC CHIẾN -->
     <div class="section-title">Kinh nghiệm & Dự án thực chiến</div>
@@ -440,7 +437,7 @@
             <table class="project-header-table" cellpadding="0" cellspacing="0">
               <tr>
                 <td class="project-title">Dự án: {{ $proj['project_name'] ?? ($proj['name'] ?? 'Tên dự án') }}</td>
-                <td class="project-duration">({{ $proj['duration'] ?? 'Chưa rõ' }})</td>
+                <td class="project-duration">({{ $proj['duration'] ?? 'Chưa rõ' }} tháng)</td>
               </tr>
             </table>
             @if(isset($proj['role']))
@@ -464,46 +461,47 @@
     </div>
 
     <!-- 🛠️ NĂNG LỰC CHUYÊN MÔN -->
-    <div class="section-title">Năng lực chuyên môn</div>
-    <table class="skills-table" cellpadding="0" cellspacing="0">
-      @if($candidate->skills && count($candidate->skills) > 0)
-        @foreach($candidate->skills->chunk(2) as $chunk)
-          <tr>
-            @foreach($chunk as $index => $skill)
-              @php
-                $levelStr = $skill->pivot->level ?? 'Cơ bản';
-                $width = '40%';
-                if (in_array($levelStr, ['Chuyên gia', 'Xuất sắc']))
-                  $width = '100%';
-                elseif ($levelStr === 'Thành thạo')
-                  $width = '85%';
-                elseif ($levelStr === 'Khá')
-                  $width = '65%';
-              @endphp
-              <td class="skill-cell {{ $index === 1 ? 'skill-cell-right' : '' }}">
-                <table class="skill-info-table" cellpadding="0" cellspacing="0">
-                  <tr>
-                    <td class="skill-name">{{ $skill->name }}</td>
-                    <td class="skill-level">{{ $levelStr }}</td>
-                  </tr>
-                </table>
-                <div class="progress-bg">
-                  <div class="progress-bar" style="width: {{ $width }};"></div>
-                </div>
-              </td>
-            @endforeach
-            @if($chunk->count() < 2)
-              <td class="skill-cell skill-cell-right"></td>
-            @endif
-          </tr>
-        @endforeach
-      @else
-        <tr>
-          <td colspan="2" style="font-style: italic; color: #94a3b8; padding-top: 3px;">Chưa cập nhật danh mục kỹ năng.
+<div class="section-title">Năng lực chuyên môn</div>
+<table class="skills-table" cellpadding="0" cellspacing="0" style="width: 100%; table-layout: fixed;">
+  @if($candidate->skills && count($candidate->skills) > 0)
+    @foreach($candidate->skills->chunk(2) as $chunk)
+      <tr>
+        @foreach($chunk as $index => $skill)
+          @php
+            $levelStr = $skill->pivot->level ?? 'Cơ bản';
+            $width = '40%';
+            if (in_array($levelStr, ['Chuyên gia', 'Xuất sắc'])) $width = '100%';
+            elseif ($levelStr === 'Thành thạo') $width = '85%';
+            elseif ($levelStr === 'Khá') $width = '65%';
+          @endphp
+          
+          <td class="skill-cell" style="width: 48%; vertical-align: top; padding-bottom: 10px; {{ $index === 0 ? 'padding-right: 4%;' : '' }}">
+            
+            <table cellpadding="0" cellspacing="0" style="width: 100%;">
+              <tr>
+                <td class="skill-name" style="text-align: left; font-weight: bold;">{{ $skill->name }}</td>
+                <td class="skill-level" style="text-align: right; font-style: italic; color: #4338ca;">{{ $levelStr }}</td>
+              </tr>
+            </table>
+            
+            <div class="progress-bg" style="background-color: #e2e8f0; height: 6px; border-radius: 3px; margin-top: 4px; width: 100%;">
+              <div class="progress-bar" style="width: {{ $width }}; background-color: #4f46e5; height: 100%; border-radius: 3px;"></div>
+            </div>
+
           </td>
-        </tr>
-      @endif
-    </table>
+        @endforeach
+        
+        @if($chunk->count() < 2)
+          <td style="width: 48%;"></td>
+        @endif
+      </tr>
+    @endforeach
+  @else
+    <tr>
+      <td colspan="2" style="font-style: italic; color: #94a3b8; padding-top: 3px; text-align: left;">Chưa cập nhật danh mục kỹ năng.</td>
+    </tr>
+  @endif
+</table>
 
     <!-- 📞 4. THÔNG TIN XÁC THỰC (REFERENCE) -->
     @php

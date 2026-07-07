@@ -22,7 +22,7 @@ class LoginController extends Controller
         if (Auth::attempt($credentials)) {            
             $user = Auth::user();
 
-            if ($user->role !== 'admin') {
+            if ($user->role !== 'admin' && $user->status === 'active') {
                 // Tạo token Sanctum (Đảm bảo trong Model User.php đã có: use HasApiTokens;)
                 $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -35,7 +35,7 @@ class LoginController extends Controller
             } else {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Tài khoản admin không được đăng nhập ở đây.',
+                    'message' => 'Tài khoản bạn chưa được kích hoạt hoặc không có quyền truy cập.',
                 ], 403);
             }
         }
@@ -60,7 +60,7 @@ class LoginController extends Controller
         if (Auth::attempt($credentials)) {            
             $user = Auth::user();
 
-            if ($user->role === 'admin') {
+            if ($user->role === 'admin' && $user->status === 'active') {
                 $token = $user->createToken('auth_token')->plainTextToken;
 
                 return response()->json([

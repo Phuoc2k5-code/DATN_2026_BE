@@ -309,7 +309,7 @@
                         <table class="project-header-table" cellpadding="0" cellspacing="0">
                             <tr>
                                 <td class="project-title">&gt; Dự án: {{ $proj['project_name'] ?? ($proj['name'] ?? 'Tên dự án') }}</td>
-                                <td class="project-duration">({{ $proj['duration'] ?? 'Chưa rõ thời gian' }})</td>
+                                <td class="project-duration">({{ $proj['duration'] ?? 'Chưa rõ thời gian' }}) tháng</td>
                             </tr>
                         </table>
                         @if(isset($proj['role']))
@@ -331,8 +331,8 @@
     <!-- 🎓 KHỐI 03: HỌC VẤN & ĐÀO TẠ (SÁT TIÊU ĐỀ) -->
     <div style="margin-top: 4px;">
         <div class="section-title" style="margin-bottom: 3px;">03. Học vấn & Đào tạo</div>
-        <div class="section-content whitespace-pre-line break-words" style="margin-top: 0; padding-top: 0; line-height: 1.3;">
-            {{ $candidate->education }}
+        <div class="section-content break-words" style="margin-top: 0; padding-top: 0; line-height: 1.3;">
+            {!! nl2br(e($candidate->education)) !!}
         </div>
     </div>
 

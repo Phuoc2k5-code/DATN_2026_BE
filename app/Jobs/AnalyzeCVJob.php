@@ -59,6 +59,8 @@ class AnalyzeCVJob implements ShouldQueue
             $parser = new Parser();
             $pdf = $parser->parseFile($cvFullPath);
             $cvContentText = $pdf->getText();
+            $cvContentText = mb_convert_encoding($cvContentText, 'UTF-8', 'UTF-8'); 
+            $cvContentText = preg_replace('/[^\x20-\x7E\x{00A0}-\x{20CF}\x{2100}-\x{243F}\x{FE30}-\x{FE4F}\x{FF00}-\x{FFEF}\x{0080}-\x{009F}\x{0100}-\x{017F}\x{0180}-\x{024F}\x{0370}-\x{03FF}\x{0400}-\x{04FF}\x{0530}-\x{058F}\x{3000}-\x{303F}\x{3040}-\x{309F}\x{30A0}-\x{30FF}\x{4E00}-\x{9FFF}\x{AC00}-\x{D7AF}]+/u', ' ', $cvContentText);
             
             if (empty(trim($cvContentText))) {
                 Log::warning("⚠️ [ATS QUEUE] Cảnh báo: File PDF đọc ra chuỗi rỗng.");
