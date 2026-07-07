@@ -149,26 +149,43 @@ class CompanyController extends Controller
             return response()->json(['success' => false, 'message' => 'Chưa cấu hình công ty.'], 404);
         }
 
-        // 2. Tìm bài đăng tuyển dụng theo ID (Bảo mật: Phải thuộc đúng công ty này)
+        // 2. Tìm bài đăng tuyển dụng theo ID (Phải thuộc đúng công ty này)
         $job = Job::where('id', $id)->where('company_id', $company->id)->first();
 
         if (!$job) {
             return response()->json(['success' => false, 'message' => 'Không tìm thấy tin tuyển dụng.'], 404);
         }
 
-        // 3. Chặn thao tác nếu tin đang ở trạng thái Chờ duyệt (pending)
+        // 3. CÁC LỚP CHẶN BẢO MẬT TRẠNG THÁI (Sửa lỗi qua mặt Admin tại đây)
+        
+        // Chặn 1: Đang chờ duyệt
         if ($job->status === 'pending') {
             return response()->json(['success' => false, 'message' => 'Tin đang chờ Admin duyệt, không thể thay đổi.'], 400);
         }
 
-        // 4. Thực hiện đảo ngược trạng thái (active <-> closed)
-        $job->status = ($job->status === 'active') ? 'closed' : 'active';
-        $job->save();
+        // Chặn 2: Đã bị từ chối
+        if ($job->status === 'rejected') {
+            return response()->json(['success' => false, 'message' => 'Tin này đã bị Admin từ chối. Bạn phải chỉnh sửa lại nội dung để gửi duyệt mới có thể hiển thị!'], 400);
+        }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Cập nhật trạng thái thành công!'
-        ], 200);
+        // Chặn 3: Đã bị khóa do vi phạm (Nếu database của bạn có trạng thái 'locked' hoặc 'blocked')
+        if (in_array($job->status, ['locked', 'blocked', 'banned'])) {
+            return response()->json(['success' => false, 'message' => 'Tin đăng này đã bị khóa vĩnh viễn do vi phạm chính sách hệ thống.'], 403);
+        }
+
+        // 4. Thực hiện đảo ngược trạng thái (Chỉ cho phép chạy khi tin đang 'active' hoặc 'closed')
+        if (in_array($job->status, ['active', 'closed'])) {
+            $job->status = ($job->status === 'active') ? 'closed' : 'active';
+            $job->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Cập nhật trạng thái thành công!'
+            ], 200);
+        }
+
+        // Lớp bảo vệ cuối cùng (Tránh các trạng thái lạ ngoài dự kiến)
+        return response()->json(['success' => false, 'message' => 'Trạng thái tin không hợp lệ để thực hiện thao tác này.'], 400);
     }
         public function extendJob(Request $request, $id)
     {
