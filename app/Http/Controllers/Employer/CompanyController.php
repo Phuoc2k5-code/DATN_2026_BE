@@ -8,7 +8,7 @@ use App\Models\Company;
 use App\Models\Job;
 use App\Models\Category;
 use App\Models\User;
-use Illuminate\Support\Facades\DB; 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use App\Mail\ApplicationStatusChanged;
@@ -18,7 +18,7 @@ class CompanyController extends Controller
     public function getOwnCompany(Request $request)
     {
         // 1. Lấy thông tin User đang đăng nhập từ Token Sanctum
-        $user = $request->user(); 
+        $user = $request->user();
 
         // 2. Tìm công ty trong bảng `companies` có `user_id` trùng với ID người dùng này
         $company = Company::where('user_id', $user->id)->first();
@@ -49,15 +49,15 @@ class CompanyController extends Controller
         }
 
         // 2. Gán các thông tin text từ form vào các cột tương ứng trong CSDL
-        $company->company_name     = $request->input('company_name');
-        $company->tax_code         = $request->input('tax_code');
-        $company->website_url      = $request->input('website_url');
-        $company->industry          = $request->input('industry');
-        $company->size              = $request->input('size');
-        $company->founded_year     = $request->input('founded_year');
-        $company->address           = $request->input('address');
-        $company->description       = $request->input('description');
-        $company->benefits          = $request->input('benefits');
+        $company->company_name = $request->input('company_name');
+        $company->tax_code = $request->input('tax_code');
+        $company->website_url = $request->input('website_url');
+        $company->industry = $request->input('industry');
+        $company->size = $request->input('size');
+        $company->founded_year = $request->input('founded_year');
+        $company->address = $request->input('address');
+        $company->description = $request->input('description');
+        $company->benefits = $request->input('benefits');
 
         // 3. Xử lý tải file Logo (nếu người dùng chọn ảnh mới)
         if ($request->hasFile('logo_url')) {
@@ -87,9 +87,9 @@ class CompanyController extends Controller
             'data' => $company
         ], 200);
     }
-     public function getOwnCompanyJobs(Request $request)
+    public function getOwnCompanyJobs(Request $request)
     {
-        $user = $request->user(); 
+        $user = $request->user();
         if (!$user) {
             return response()->json(['success' => false, 'message' => 'Phiên đăng nhập đã hết hạn.'], 401);
         }
@@ -101,17 +101,19 @@ class CompanyController extends Controller
 
         // SỬA ĐỔI: Sử dụng Model Job kết hợp với `with('skills')` để lấy kèm kỹ năng
         $jobs = Job::where('company_id', $company->id)
-            ->with(['skills' => function($query) {
-                $query->select('skills.id', 'skills.name'); // Chỉ lấy id và name kỹ năng cho nhẹ dữ liệu
-            }])
+            ->with([
+                'skills' => function ($query) {
+                    $query->select('skills.id', 'skills.name'); // Chỉ lấy id và name kỹ năng cho nhẹ dữ liệu
+                }
+            ])
             ->leftJoin('categories', 'jobs.category_id', '=', 'categories.id')
-            
+
             // Cú pháp chọn lấy mọi cột của jobs và lấy tên category
             ->select('jobs.*', 'categories.name as category_name')
-            
+
             // 1. Format lại ngày hết hạn
             ->selectRaw('DATE_FORMAT(jobs.expired_at, "%d/%m/%Y") as deadline')
-            
+
             // 2. Tự động phiên dịch Trạng thái từ Database (Tiếng Anh -> Tiếng Việt)
             ->selectRaw('
                 CASE 
@@ -121,13 +123,13 @@ class CompanyController extends Controller
                     ELSE jobs.status 
                 END as status
             ')
-            
+
             // 3. Đếm tổng lượt xem
             ->selectRaw('(SELECT COALESCE(SUM(click_count), 0) FROM job_clicks WHERE job_clicks.job_id = jobs.id) as views')
-            
+
             // 4. Đếm tổng số lượng CV nộp vào
             ->selectRaw('(SELECT COUNT(*) FROM applications WHERE applications.job_id = jobs.id) as applicants')
-            
+
             ->orderBy('jobs.created_at', 'desc')
             ->get();
 
@@ -136,7 +138,7 @@ class CompanyController extends Controller
             'data' => $jobs
         ], 200);
     }
-        public function toggleJobStatus(Request $request, $id)
+    public function toggleJobStatus(Request $request, $id)
     {
         // 1. Xác thực tài khoản nhà tuyển dụng
         $user = $request->user();
@@ -170,16 +172,19 @@ class CompanyController extends Controller
             'message' => 'Cập nhật trạng thái thành công!'
         ], 200);
     }
-        public function extendJob(Request $request, $id)
+    public function extendJob(Request $request, $id)
     {
         $user = $request->user();
-        if (!$user) return response()->json(['success' => false, 'message' => 'Hết hạn phiên.'], 401);
+        if (!$user)
+            return response()->json(['success' => false, 'message' => 'Hết hạn phiên.'], 401);
 
         $company = Company::where('user_id', $user->id)->first();
-        if (!$company) return response()->json(['success' => false, 'message' => 'Chưa cấu hình công ty.'], 404);
+        if (!$company)
+            return response()->json(['success' => false, 'message' => 'Chưa cấu hình công ty.'], 404);
 
         $job = Job::where('id', $id)->where('company_id', $company->id)->first();
-        if (!$job) return response()->json(['success' => false, 'message' => 'Không tìm thấy tin tuyển dụng.'], 404);
+        if (!$job)
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy tin tuyển dụng.'], 404);
 
         // Kiểm tra dữ liệu ngày tháng gửi lên
         $request->validate([
@@ -191,15 +196,15 @@ class CompanyController extends Controller
 
         // Cập nhật ngày hết hạn mới (Mặc định cho hết hạn vào 23:59:59 của ngày đó)
         $job->expired_at = $request->new_deadline . ' 23:59:59';
-        
+
         if ($job->status === 'closed') {
             $job->status = 'active';
         }
-        
+
         $job->save();
 
         return response()->json([
-            'success' => true, 
+            'success' => true,
             'message' => 'Gia hạn thành công! Tin đã được cập nhật.'
         ], 200);
     }
@@ -207,10 +212,12 @@ class CompanyController extends Controller
     {
         // Xác thực người dùng và công ty
         $user = $request->user();
-        if (!$user) return response()->json(['success' => false, 'message' => 'Hết hạn phiên.'], 401);
+        if (!$user)
+            return response()->json(['success' => false, 'message' => 'Hết hạn phiên.'], 401);
 
         $company = Company::where('user_id', $user->id)->first();
-        if (!$company) return response()->json(['success' => false, 'message' => 'Chưa cấu hình công ty.'], 404);
+        if (!$company)
+            return response()->json(['success' => false, 'message' => 'Chưa cấu hình công ty.'], 404);
 
         // Bổ sung luật kiểm tra mảng 'skills' gửi lên từ React
         $validated = $request->validate([
@@ -228,7 +235,7 @@ class CompanyController extends Controller
             'skills' => 'required|array', // Bắt buộc phải có thuộc tính skills và phải là mảng
             'skills.*' => 'integer|exists:skills,id', // Từng phần tử trong mảng phải là ID số nguyên tồn tại ở bảng skills
         ], [
-            
+
             'skills.required' => 'Vui lòng lựa chọn ít nhất một kỹ năng chuyên môn yêu cầu.',
             'skills.array' => 'Dữ liệu kỹ năng không đúng định dạng mảng.',
         ]);
@@ -260,17 +267,20 @@ class CompanyController extends Controller
             'message' => 'Đăng tin thành công! Vui lòng chờ Quản trị viên phê duyệt.'
         ], 201);
     }
-        public function updateJob(Request $request, $id)
+    public function updateJob(Request $request, $id)
     {
         $user = $request->user();
-        if (!$user) return response()->json(['success' => false, 'message' => 'Hết hạn phiên.'], 401);
+        if (!$user)
+            return response()->json(['success' => false, 'message' => 'Hết hạn phiên.'], 401);
 
         $company = Company::where('user_id', $user->id)->first();
-        if (!$company) return response()->json(['success' => false, 'message' => 'Chưa cấu hình công ty.'], 404);
+        if (!$company)
+            return response()->json(['success' => false, 'message' => 'Chưa cấu hình công ty.'], 404);
 
         // Tìm bài đăng cần sửa
         $job = Job::where('id', $id)->where('company_id', $company->id)->first();
-        if (!$job) return response()->json(['success' => false, 'message' => 'Không tìm thấy tin tuyển dụng.'], 404);
+        if (!$job)
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy tin tuyển dụng.'], 404);
 
         // 1. CẬP NHẬT: Thêm điều kiện validate cho mảng skills gửi lên từ React
         $validated = $request->validate([
@@ -299,9 +309,9 @@ class CompanyController extends Controller
         $job->description = $validated['description'];
         $job->requirements = $validated['requirements'];
         $job->benefits = $validated['benefits'] ?? null;
-        
+
         // Đổi trạng thái về chờ duyệt để Admin kiểm tra lại nội dung mới
-        $job->status = 'pending'; 
+        $job->status = 'pending';
         $job->save();
 
         // 2. CẬP NHẬT: Đồng bộ lại danh sách kỹ năng mới (Xóa liên kết cũ, nạp liên kết mới)
@@ -320,7 +330,7 @@ class CompanyController extends Controller
         try {
             // Lấy ra tất cả kỹ năng gồm id và name từ bảng tuyển dụng
             $skills = \App\Models\Skill::select('id', 'name')->orderBy('name', 'asc')->get();
-            
+
             return response()->json([
                 'success' => true,
                 'data' => $skills
@@ -332,13 +342,15 @@ class CompanyController extends Controller
             ], 500);
         }
     }
-       public function getCompanyCandidates(Request $request)
+    public function getCompanyCandidates(Request $request)
     {
         $user = $request->user();
-        if (!$user) return response()->json(['success' => false, 'message' => 'Hết hạn phiên.'], 401);
+        if (!$user)
+            return response()->json(['success' => false, 'message' => 'Hết hạn phiên.'], 401);
 
         $company = \App\Models\Company::where('user_id', $user->id)->first();
-        if (!$company) return response()->json(['success' => false, 'message' => 'Chưa cấu hình công ty.'], 404);
+        if (!$company)
+            return response()->json(['success' => false, 'message' => 'Chưa cấu hình công ty.'], 404);
 
         // 1. Khởi tạo Query (Chú ý dấu chấm phẩy ở cuối dòng orderBy)
         $query = \Illuminate\Support\Facades\DB::table('jobs')
@@ -358,11 +370,11 @@ class CompanyController extends Controller
                 'cv_files.file_path',
                 'applications.matching_score'
             )
-            ->orderBy('applications.applied_at', 'desc'); 
+            ->orderBy('applications.applied_at', 'desc');
 
         // 2. Chèn bộ lọc kỹ năng
         if ($request->has('skill') && $request->skill !== 'Tất cả') {
-            $skillId = $request->skill; 
+            $skillId = $request->skill;
 
             $query->whereExists(function ($q) use ($skillId) {
                 $q->select(\Illuminate\Support\Facades\DB::raw(1))
@@ -373,7 +385,7 @@ class CompanyController extends Controller
         }
 
         // 3. Thực thi lấy dữ liệu
-       $candidates = $query->get();
+        $candidates = $query->get();
 
         // 4. KIỂM TRA: Nếu không có ứng viên nào, trả về mảng rỗng để không bị lỗi map
         if ($candidates->isEmpty()) {
@@ -404,7 +416,7 @@ class CompanyController extends Controller
                 'email' => $item->email,
                 'file_path' => $item->file_path,
                 'matchScore' => $item->matching_score,
-                'skills' => [] 
+                'skills' => []
             ];
         });
 
@@ -413,7 +425,7 @@ class CompanyController extends Controller
             'data' => $formattedCandidates
         ], 200);
     }
-        public function updateApplicationStatus(Request $request, $id)
+    public function updateApplicationStatus(Request $request, $id)
     {
         // Xác thực tài khoản nhà tuyển dụng đang đăng nhập
         $user = $request->user();
@@ -421,19 +433,19 @@ class CompanyController extends Controller
 
         if (!$company) {
             return response()->json([
-                'success' => false, 
+                'success' => false,
                 'message' => 'Tài khoản không có quyền thực hiện hành động này.'
             ], 403);
         }
 
         // Tên công ty động dùng làm tên người gửi thư
-        $companyName = $company->company_name ?? 'Công ty của tôi'; 
+        $companyName = $company->company_name ?? 'Công ty của tôi';
 
         //  Tìm kiếm đơn ứng tuyển cần cập nhật trạng thái
         $application = DB::table('applications')->where('id', $id)->first();
         if (!$application) {
             return response()->json([
-                'success' => false, 
+                'success' => false,
                 'message' => 'Đơn ứng tuyển không tồn tại.'
             ], 404);
         }
@@ -457,22 +469,22 @@ class CompanyController extends Controller
 
         //  Kiểm tra nếu có email thì kích hoạt tiến trình gửi thư thật
         if ($candidate && $candidate->email) {
-        try {
-            // Thay chữ "send" bằng chữ "queue"
-            Mail::to($candidate->email)->queue(
-                new ApplicationStatusChanged($candidate, $newStatus, $companyName)
-            );
-        } catch (\Exception $e) {
-            // Ghi log nếu có lỗi khi đẩy vào hàng đợi
-            \Illuminate\Support\Facades\Log::error('Lỗi đưa email vào Queue: ' . $e->getMessage());
+            try {
+                // Thay chữ "send" bằng chữ "queue"
+                Mail::to($candidate->email)->queue(
+                    new ApplicationStatusChanged($candidate, $newStatus, $companyName)
+                );
+            } catch (\Exception $e) {
+                // Ghi log nếu có lỗi khi đẩy vào hàng đợi
+                \Illuminate\Support\Facades\Log::error('Lỗi đưa email vào Queue: ' . $e->getMessage());
+            }
         }
-    }
         return response()->json([
-            'success' => true, 
+            'success' => true,
             'message' => 'Cập nhật trạng thái và gửi email thông báo thành công!'
         ]);
     }
-            public function getCandidates(Request $request) 
+    public function getCandidates(Request $request)
     {
         //  Khởi tạo query từ bảng candidates của bạn
         $query = DB::table('candidates');
@@ -483,10 +495,10 @@ class CompanyController extends Controller
 
             $query->whereExists(function ($q) use ($skillId) {
                 $q->select(DB::raw(1))
-                ->from('candidate_skill')
-                // Khớp id của bảng candidates với candidate_id của bảng trung gian
-                ->whereColumn('candidate_skill.candidate_id', 'candidates.id') 
-                ->where('candidate_skill.skill_id', $skillId);
+                    ->from('candidate_skill')
+                    // Khớp id của bảng candidates với candidate_id của bảng trung gian
+                    ->whereColumn('candidate_skill.candidate_id', 'candidates.id')
+                    ->where('candidate_skill.skill_id', $skillId);
             });
         }
 
@@ -512,10 +524,12 @@ class CompanyController extends Controller
     public function getDashboardStats(Request $request)
     {
         $user = $request->user();
-        if (!$user) return response()->json(['success' => false, 'message' => 'Hết hạn phiên.'], 401);
+        if (!$user)
+            return response()->json(['success' => false, 'message' => 'Hết hạn phiên.'], 401);
 
         $company = \App\Models\Company::where('user_id', $user->id)->first();
-        if (!$company) return response()->json(['success' => false, 'message' => 'Chưa cấu hình công ty.'], 404);
+        if (!$company)
+            return response()->json(['success' => false, 'message' => 'Chưa cấu hình công ty.'], 404);
 
         // 1. Đếm TỔNG số tin tuyển dụng của công ty này
         $totalJobs = \Illuminate\Support\Facades\DB::table('jobs')
@@ -527,27 +541,27 @@ class CompanyController extends Controller
         // Nếu DB bạn lưu là 1 (hoạt động), 0 (ẩn) thì sửa thành ->where('status', 1) nhé.
         $activeJobs = \Illuminate\Support\Facades\DB::table('jobs')
             ->where('company_id', $company->id)
-            ->where('status', 'active') 
+            ->where('status', 'active')
             ->count();
         $totalCVs = \Illuminate\Support\Facades\DB::table('applications')
-        ->join('jobs', 'applications.job_id', '=', 'jobs.id')
-        ->where('jobs.company_id', $company->id)
-        ->count();
-       $totalViews = \Illuminate\Support\Facades\DB::table('job_clicks')
-        ->join('jobs', 'job_clicks.job_id', '=', 'jobs.id') // Gộp với bảng jobs để lọc theo công ty[cite: 1]
-        ->where('jobs.company_id', $company->id)
-        ->sum('job_clicks.click_count');
+            ->join('jobs', 'applications.job_id', '=', 'jobs.id')
+            ->where('jobs.company_id', $company->id)
+            ->count();
+        $totalViews = \Illuminate\Support\Facades\DB::table('job_clicks')
+            ->join('jobs', 'job_clicks.job_id', '=', 'jobs.id') // Gộp với bảng jobs để lọc theo công ty[cite: 1]
+            ->where('jobs.company_id', $company->id)
+            ->sum('job_clicks.click_count');
         $interviewCVs = \Illuminate\Support\Facades\DB::table('applications')
-        ->join('jobs', 'applications.job_id', '=', 'jobs.id')
-        ->where('jobs.company_id', $company->id)
-        ->where('applications.status', 'Phỏng vấn') 
-        ->count();
+            ->join('jobs', 'applications.job_id', '=', 'jobs.id')
+            ->where('jobs.company_id', $company->id)
+            ->where('applications.status', 'Phỏng vấn')
+            ->count();
 
         // Tính tỷ lệ %, dùng toán tử ba ngôi để tránh lỗi chia cho 0 (Division by zero) nếu chưa có ai nộp bài
         $interviewRate = $totalCVs > 0 ? round(($interviewCVs / $totalCVs) * 100, 1) : 0;
 
-       // Nhận số tuần cần lùi về từ Request (0: Tuần này, 1: Tuần trước, 2: 2 tuần trước...)
-            $weekOffset = (int) $request->input('week_offset', 0); // Lấy số tuần lùi về từ React
+        // Nhận số tuần cần lùi về từ Request (0: Tuần này, 1: Tuần trước, 2: 2 tuần trước...)
+        $weekOffset = (int) $request->input('week_offset', 0); // Lấy số tuần lùi về từ React
 
         // Dùng copy() để không làm biến dạng ngày gốc
         $baseDate = \Carbon\Carbon::now()->subWeeks($weekOffset);
@@ -557,7 +571,7 @@ class CompanyController extends Controller
         $dailyClicks = \Illuminate\Support\Facades\DB::table('job_clicks')
             ->join('jobs', 'job_clicks.job_id', '=', 'jobs.id')
             ->select(
-                \Illuminate\Support\Facades\DB::raw('DATE(job_clicks.click_date) as date'), 
+                \Illuminate\Support\Facades\DB::raw('DATE(job_clicks.click_date) as date'),
                 \Illuminate\Support\Facades\DB::raw('SUM(job_clicks.click_count) as total_clicks')
             )
             ->where('jobs.company_id', $company->id)
@@ -568,28 +582,28 @@ class CompanyController extends Controller
 
         $weeklyViewsChart = [];
         $dayLabels = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'];
-        
+
         // ÉP BUỘC SINH RA 7 NGÀY (Dù database không có dòng nào thì vẫn tạo ra cột = 0)
         for ($i = 0; $i < 7; $i++) {
             $currentDay = $baseDate->copy()->startOfWeek()->addDays($i);
             $date = $currentDay->format('Y-m-d');
-            
+
             $clicks = isset($dailyClicks[$date]) ? (int) $dailyClicks[$date]->total_clicks : 0;
-            
+
             $weeklyViewsChart[] = [
                 'label' => $dayLabels[$i],
                 'date_format' => $currentDay->format('d/m'), // Sinh ngày tháng chuẩn
                 'clicks' => $clicks // Sẽ bằng 0 nếu tuần đó trống
             ];
         }
-            // Lấy danh sách tất cả job_id thuộc về công ty này
+        // Lấy danh sách tất cả job_id thuộc về công ty này
         $jobIds = \Illuminate\Support\Facades\DB::table('jobs')
             ->where('company_id', $company->id)
             ->pluck('id')
             ->toArray();
 
         $cvChartData = [];
-    
+
         // Lấy thời điểm hiện tại và mốc ngày 1 của tháng này
         $now = \Carbon\Carbon::now();
         $startOfMonth = $now->copy()->startOfMonth();
@@ -598,19 +612,19 @@ class CompanyController extends Controller
         $weeks = [
             1 => [
                 'start' => $startOfMonth->copy(),
-                'end'   => $startOfMonth->copy()->addDays(6)->endOfDay() // Ngày 1 -> 7
+                'end' => $startOfMonth->copy()->addDays(6)->endOfDay() // Ngày 1 -> 7
             ],
             2 => [
                 'start' => $startOfMonth->copy()->addDays(7),
-                'end'   => $startOfMonth->copy()->addDays(13)->endOfDay() // Ngày 8 -> 14
+                'end' => $startOfMonth->copy()->addDays(13)->endOfDay() // Ngày 8 -> 14
             ],
             3 => [
                 'start' => $startOfMonth->copy()->addDays(14),
-                'end'   => $startOfMonth->copy()->addDays(20)->endOfDay() // Ngày 15 -> 21
+                'end' => $startOfMonth->copy()->addDays(20)->endOfDay() // Ngày 15 -> 21
             ],
             4 => [
                 'start' => $startOfMonth->copy()->addDays(21),
-                'end'   => $startOfMonth->copy()->endOfMonth()->endOfDay() // Ngày 22 -> Cuối tháng
+                'end' => $startOfMonth->copy()->endOfMonth()->endOfDay() // Ngày 22 -> Cuối tháng
             ],
         ];
 
@@ -628,19 +642,19 @@ class CompanyController extends Controller
             $isCurrent = $now->between($dates['start'], $dates['end']);
 
             $cvChartData[] = [
-                'label'      => 'Tuần ' . $weekNum,
-                'range'      => $dates['start']->format('d/m') . ' - ' . $dates['end']->format('d/m'),
-                'cvs'        => $cvCount,
-                'is_current' => $isCurrent 
+                'label' => 'Tuần ' . $weekNum,
+                'range' => $dates['start']->format('d/m') . ' - ' . $dates['end']->format('d/m'),
+                'cvs' => $cvCount,
+                'is_current' => $isCurrent
             ];
         }
-            return response()->json([
+        return response()->json([
             'success' => true,
             'data' => [
                 'totalJobs' => $totalJobs,
                 'activeJobs' => $activeJobs,
                 'totalCVs' => $totalCVs,
-                'totalViews' => (int)$totalViews,
+                'totalViews' => (int) $totalViews,
                 'interviewRate' => $interviewRate,
                 'weeklyViewsChart' => $weeklyViewsChart,
                 'cvChartData' => $cvChartData,
@@ -652,39 +666,48 @@ class CompanyController extends Controller
     public function storeCompany(Request $request)
     {
         try {
-            // 1. Viết Validate trực tiếp (Bổ sung thêm trường logo)
+            // 1. Viết Validate trực tiếp (Cập nhật cả logo lẫn business_license dạng File ảnh)
             $validator = Validator::make($request->all(), [
-                'email'            => 'required|email|exists:users,email',
-                'company_name'     => 'required|string|max:255',
-                'tax_code'         => 'required|string|max:50|unique:companies,tax_code',
-                'business_license' => 'nullable|string|max:255',
-                'website_url'      => 'nullable|url|max:255',
-                'description'      => 'nullable|string',
-                'industry'         => 'required|string|max:255',
-                'size'             => 'required|string|max:100', 
-                'founded_year'     => 'nullable|integer|min:1900|max:' . date('Y'),
-                'address'          => 'required|string|max:255',
-                'benefits'         => 'nullable|string',
-                'logo'             => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048', // Validate File ảnh max 2MB
+                'email' => 'required|email|exists:users,email',
+                'company_name' => 'required|string|max:255',
+                'tax_code' => 'required|string|max:50|unique:companies,tax_code',
+                'website_url' => 'nullable|url|max:255',
+                'description' => 'nullable|string',
+                'industry' => 'required|string|max:255',
+                'size' => 'required|string|max:100',
+                'founded_year' => 'nullable|integer|min:1900|max:' . date('Y'),
+                'address' => 'required|string|max:255',
+                'benefits' => 'nullable|string',
+                'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048', // Max 2MB
+
+                // 🚀 CẬP NHẬT: Validate file ảnh Giấy phép kinh doanh (Max 4MB để đảm bảo độ nét khi admin đọc)
+                'business_license' => 'required|image|mimes:jpeg,png,jpg|max:4096',
             ], [
-                'email.required'        => 'Không tìm thấy thông tin tài khoản vừa đăng ký.',
-                'email.exists'          => 'Tài khoản liên kết không tồn tại trên hệ thống.',
+                'email.required' => 'Không tìm thấy thông tin tài khoản vừa đăng ký.',
+                'email.exists' => 'Tài khoản liên kết không tồn tại trên hệ thống.',
                 'company_name.required' => 'Tên công ty không được để trống.',
-                'tax_code.required'     => 'Mã số thuế không được để trống.',
-                'tax_code.unique'       => 'Mã số thuế này đã tồn tại trên hệ thống.',
-                'website_url.url'       => 'Định dạng đường dẫn Website không hợp lệ.',
-                'industry.required'     => 'Vui lòng nhập hoặc chọn ngành nghề kinh doanh.',
-                'size.required'         => 'Vui lòng chọn quy mô công ty.',
-                'address.required'      => 'Địa chỉ công ty không được để trống.',
-                'logo.image'            => 'File tải lên phải là định dạng hình ảnh.',
-                'logo.mimes'            => 'Logo chỉ chấp nhận các định dạng: jpeg, png, jpg, gif.',
-                'logo.max'              => 'Dung lượng logo không được vượt quá 2MB.',
+                'tax_code.required' => 'Mã số thuế không được để trống.',
+                'tax_code.unique' => 'Mã số thuế này đã tồn tại trên hệ thống.',
+                'website_url.url' => 'Định dạng đường dẫn Website không hợp lệ.',
+                'industry.required' => 'Vui lòng nhập hoặc chọn ngành nghề kinh doanh.',
+                'size.required' => 'Vui lòng chọn quy mô công ty.',
+                'address.required' => 'Địa chỉ công ty không được để trống.',
+
+                'logo.image' => 'File tải lên của Logo phải là định dạng hình ảnh.',
+                'logo.mimes' => 'Logo chỉ chấp nhận các định dạng: jpeg, png, jpg, gif.',
+                'logo.max' => 'Dung lượng logo không được vượt quá 2MB.',
+
+                // 🚀 BỔ SUNG: Thông báo lỗi tiếng Việt cho Giấy phép kinh doanh
+                'business_license.required' => 'Vui lòng tải lên ảnh Giấy phép kinh doanh để xác thực.',
+                'business_license.image' => 'File tải lên của Giấy phép kinh doanh phải là hình ảnh.',
+                'business_license.mimes' => 'Giấy phép kinh doanh chỉ chấp nhận các định dạng: jpeg, png, jpg.',
+                'business_license.max' => 'Dung lượng ảnh Giấy phép kinh doanh không được vượt quá 4MB.',
             ]);
 
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'errors'  => $validator->errors()
+                    'errors' => $validator->errors()
                 ], 422);
             }
 
@@ -702,45 +725,53 @@ class CompanyController extends Controller
 
             // 4. Lấy dữ liệu hợp lệ và gán các trường hệ thống
             $validatedData = $validator->validated();
-            
-            $validatedData['user_id'] = $user->id; 
+
+            $validatedData['user_id'] = $user->id;
             $validatedData['is_verified'] = false; // Chờ Admin duyệt bài
             $validatedData['reject_reason'] = '';
 
             // 5. XỬ LÝ UPLOAD LOGO VÀO THƯ MỤC PUBLIC
             if ($request->hasFile('logo')) {
-                $file = $request->file('logo');
-                // Tạo tên file duy nhất để tránh trùng lặp: ví dụ 171892102_logo.png
-                $fileName = time() . '_' . $file->getClientOriginalName();
-                
+                $logoFile = $request->file('logo');
+                $logoName = time() . '_logo_' . $logoFile->getClientOriginalName();
+
                 // Di chuyển file vào thư mục public/logoCompany
-                $file->move(public_path('logoCompany'), $fileName);
-                
-                // Lưu đường dẫn vào database để frontend gọi hiển thị
-                $validatedData['logo_url'] = 'logoCompany/' . $fileName;
+                $logoFile->move(public_path('logoCompany'), $logoName);
+                $validatedData['logo_url'] = 'logoCompany/' . $logoName;
             } else {
-                // Nếu không upload ảnh, sử dụng ảnh mặc định của hệ thống
                 $validatedData['logo_url'] = 'logoCompany/logo-default.png';
             }
 
-            // Loại bỏ các trường thừa không có trong bảng companies
+            // 6. 🚀 XỬ LÝ UPLOAD ẢNH GIẤY PHÉP KINH DOANH VÀO THƯ MỤC PUBLIC
+            if ($request->hasFile('business_license')) {
+                $licenseFile = $request->file('business_license');
+                $licenseName = time() . '_gpkd_' . $licenseFile->getClientOriginalName();
+
+                // Di chuyển file vào thư mục public/businessLicense
+                $licenseFile->move(public_path('businessLicense'), $licenseName);
+
+                // Ghi đè trường dữ liệu thành chuỗi đường dẫn lưu trong DB
+                $validatedData['business_license'] = 'businessLicense/' . $licenseName;
+            }
+
+            // Loại bỏ các trường thừa không có cấu trúc tương ứng trong bảng companies
             unset($validatedData['email']);
             unset($validatedData['logo']);
 
-            // 6. Tiến hành lưu dữ liệu
+            // 7. Tiến hành lưu dữ liệu
             $company = Company::create($validatedData);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Cập nhật thông tin công ty và logo thành công! Vui lòng chờ kích hoạt.',
-                'data'    => $company
+                'message' => 'Đăng ký hồ sơ doanh nghiệp thành công! Vui lòng chờ Ban quản trị phê duyệt.',
+                'data' => $company
             ], 201);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Đã xảy ra lỗi hệ thống nghiêm trọng.',
-                'error'   => $e->getMessage()
+                'error' => $e->getMessage()
             ], 500);
         }
     }

@@ -174,7 +174,7 @@
 		/* 💡 KHỐI NGƯỜI XÁC NHẬN - ÉP ĐỂ XUỐNG DƯỚI CÙNG CỦA SIDEBAR */
 		.sidebar-bottom-wrapper {
 			position: absolute;
-			bottom: 100px;
+			bottom: 35px;
 			left: 20px;
 			right: 20px;
 		}
@@ -485,7 +485,7 @@
 								<table class="project-header-table" cellpadding="0" cellspacing="0">
 									<tr>
 										<td class="project-title">💼 Dự án: {{ $proj['project_name'] ?? ($proj['name'] ?? 'Tên dự án') }}</td>
-										<td class="project-duration">⏱️ {{ $proj['duration'] ?? 'Chưa rõ' }}</td>
+										<td class="project-duration">⏱️ {{ $proj['duration'] ?? 'Chưa rõ' }} tháng</td>
 									</tr>
 								</table>
 								@if(isset($proj['role']))
@@ -504,7 +504,7 @@
 				<div class="content-section-title">
 					<span class="title-indicator" style="background-color: #f59e0b;"></span>Học vấn & Bằng cấp
 				</div>
-				<div class="education-box whitespace-pre-line break-words">
+				<div class="education-box break-words">
 					{!! nl2br(e($candidate->education)) !!}
 				</div>
 
