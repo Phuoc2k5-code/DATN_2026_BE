@@ -5,6 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\UserLockedMail;
+use App\Mail\UserUnlockedMail;
 
 class UserController extends Controller
 {
@@ -48,6 +51,10 @@ class UserController extends Controller
     {
         $user = User::findOrFail($id);
 
+        if ($user->email) {
+            Mail::to($user->email)->send(new UserLockedMail($user));
+        }
+
         $user->delete();
 
         return response()->json([
@@ -61,6 +68,10 @@ class UserController extends Controller
         $user = User::withTrashed()->findOrFail($id);
 
         $user->restore();
+
+        if ($user->email) {
+            Mail::to($user->email)->send(new UserUnlockedMail($user));
+        }
 
         return response()->json([
             'success' => true,

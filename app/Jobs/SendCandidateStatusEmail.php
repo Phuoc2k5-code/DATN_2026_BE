@@ -26,8 +26,7 @@ class SendCandidateStatusEmail implements ShouldQueue
     // 2. Chạy ngầm việc gửi mail ở đây
     public function handle()
     {
-        // Copy ĐOẠN CODE GỬI MAIL CŨ của bạn vào đây
-        // Ví dụ:
+    
         Mail::send('emails.candidate_status', $this->data, function ($message) {
             $message->to($this->email)
                     ->subject('Cập nhật trạng thái ứng tuyển');
