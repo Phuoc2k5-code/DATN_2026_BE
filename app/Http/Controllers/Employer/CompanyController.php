@@ -414,14 +414,6 @@ class CompanyController extends Controller
 
         // 5. Format dữ liệu
         $formattedCandidates = $candidates->map(function ($item) {
-            $statusMap = [
-                'pending' => 'Chờ duyệt',
-                'viewed' => 'Đã xem',
-                'interviewing' => 'Phỏng vấn',
-                'accepted' => 'Nhận việc',
-                'rejected' => 'Từ chối'
-            ];
-
             return [
                 'id' => $item->id,
                 'name' => $item->name,
@@ -571,7 +563,7 @@ class CompanyController extends Controller
         $interviewCVs = \Illuminate\Support\Facades\DB::table('applications')
             ->join('jobs', 'applications.job_id', '=', 'jobs.id')
             ->where('jobs.company_id', $company->id)
-            ->where('applications.status', 'Phỏng vấn')
+            ->where('applications.status', 'interviewing')
             ->count();
 
         // Tính tỷ lệ %, dùng toán tử ba ngôi để tránh lỗi chia cho 0 (Division by zero) nếu chưa có ai nộp bài
