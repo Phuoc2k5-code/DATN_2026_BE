@@ -99,7 +99,6 @@ class ProcessAiRecommendation implements ShouldQueue
                         ];
                     }
                 }
-
                 // Lấy lại danh sách gốc đầy đủ các Job để map thông tin (kèm quan hệ model)
                 $jobs = Job::with(['category', 'skills', 'company'])->where('status', 'active')->latest()->take(20)->get();
 
@@ -113,12 +112,11 @@ class ProcessAiRecommendation implements ShouldQueue
                     return $job;
                 })
                 ->filter(function ($job) {
-                    return $job->matching_score >= 30; // Lọc bỏ job < 10 điểm
+                    return $job->matching_score >= 30; // Lọc bỏ job < 30 điểm
                 })
                 ->sortByDesc('matching_score')
                 ->values()
                 ->toArray();
-
                 // Lưu kết quả vào bộ nhớ đệm 7 ngày
                 Cache::put($this->cacheResultKey, $recommendedJobsArray, now()->addDays(7));
                 // CẬP NHẬT TRẠNG THÁI HOÀN THÀNH

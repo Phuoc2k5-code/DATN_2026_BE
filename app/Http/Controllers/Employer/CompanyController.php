@@ -413,19 +413,12 @@ class CompanyController extends Controller
         }
 
         // 5. Format dữ liệu
-        $formattedCandidates = $candidates->map(function ($item) {
-            $statusMap = [
-                'pending' => 'Chờ duyệt',
-                'viewed' => 'Đã xem',
-                'interviewing' => 'Phỏng vấn',
-                'accepted' => 'Nhận việc',
-                'rejected' => 'Từ chối'
-            ];
+        $formattedCandidates = $candidates->map(function ($item) {           
 
             return [
                 'id' => $item->id,
                 'name' => $item->name,
-                'status' => $statusMap[$item->status] ?? $item->status,
+                'status' => $item->status,
                 'timeApplied' => isset($item->timeApplied) ? date('d/m/Y H:i', strtotime($item->timeApplied)) : 'N/A',
                 'jobTitle' => $item->jobTitle,
                 'exp' => $item->exp,

@@ -309,9 +309,12 @@ class AIController extends Controller
                         $cvFullPath = public_path(ltrim($latestCv->file_path, '/'));
                         if (file_exists($cvFullPath)) {
                             // Tối ưu: Dùng cache bóc tách PDF tránh đọc đĩa nhiều lần
-                            $cvContentText = Cache::remember("cv_raw_text_id_{$latestCv->id}", now()->addDays(7), function() use ($cvFullPath) {
+                            $rawText = Cache::remember("cv_raw_text_id_{$latestCv->id}", now()->addDays(7), function () use ($cvFullPath) {
                                 return (new Parser())->parseFile($cvFullPath)->getText();
                             });
+
+                            // 🔥 FIX CHÍ MẠNG: Lọc sạch ký tự Malformed UTF-8 trước khi truyền đi tiếp
+                            $cvContentText = mb_convert_encoding($rawText, 'UTF-8', 'UTF-8');
                             $chosenType = 'uploaded';
                         }
                     }
@@ -332,9 +335,12 @@ class AIController extends Controller
                     if ($latestCv) {
                         $cvFullPath = public_path(ltrim($latestCv->file_path, '/'));
                         if (file_exists($cvFullPath)) {
-                            $cvContentText = Cache::remember("cv_raw_text_id_{$latestCv->id}", now()->addDays(7), function() use ($cvFullPath) {
+                            $rawText = Cache::remember("cv_raw_text_id_{$latestCv->id}", now()->addDays(7), function () use ($cvFullPath) {
                                 return (new Parser())->parseFile($cvFullPath)->getText();
                             });
+
+                            // 🔥 FIX CHÍ MẠNG: Lọc sạch ký tự Malformed UTF-8 ở luồngfallback
+                            $cvContentText = mb_convert_encoding($rawText, 'UTF-8', 'UTF-8');
                             $chosenType = 'uploaded';
                             $chosenId = $latestCv->id;
                         }
@@ -358,7 +364,6 @@ class AIController extends Controller
             $cacheStatusKey = "ai_status_{$userId}_{$chosenType}_{$chosenId}";
             $cacheResultKey = "user_ai_jobs_result_{$userId}_{$chosenType}_{$chosenId}";
 
-            // BƯỚC 1: KIỂM TRA XEM ĐÃ CÓ KẾT QUẢ SẴN TRONG BỘ NHỚ ĐỆM CHƯA
             if (Cache::has($cacheFingerprintKey) && Cache::get($cacheFingerprintKey) === $currentSystemFingerprint) {
                 if (Cache::get($cacheStatusKey) === 'completed' && Cache::has($cacheResultKey)) {
                     Log::info("⚡ [CACHE HIT] Trả nhanh kết quả từ bộ nhớ đệm.");
@@ -395,7 +400,6 @@ class AIController extends Controller
                     'title' => $job->title,
                     'category' => $job->category->name ?? 'Chưa phân loại',
                     'skills' => $job->skills->pluck('name')->toArray()
-                    // 🔥 BỎ ĐOẠN DESCRIPTION ĐỂ CHẠY NHANH HƠN VÌ CÔNG THỨC CHỈ CẦN TITLE, CATEGORY VÀ SKILL!
                 ];
             }
 
@@ -405,7 +409,13 @@ class AIController extends Controller
 
             // 🔥 ĐẨY VÀO QUEUE CHẠY NGẦM VÀ LẬP TỨC THOÁT RA TRẢ LỜI FRONTEND
             ProcessAiRecommendation::dispatch(
-                $userId, $cvContentText, $jobsDataForAI, $cacheResultKey, $cacheStatusKey, $chosenType, $chosenId
+                $userId,
+                $cvContentText,
+                $jobsDataForAI,
+                $cacheResultKey,
+                $cacheStatusKey,
+                $chosenType,
+                $chosenId
             );
 
             return response()->json([
@@ -414,7 +424,7 @@ class AIController extends Controller
                 'message' => 'Đã tiếp nhận! Hệ thống AI đang phân tích dữ liệu ngầm.',
                 'analyzed_type' => $chosenType,
                 'analyzed_id' => $chosenId
-            ], 202);
+            ], 202, [], JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE);
 
         } catch (\Exception $e) {
             Log::error("❌ Lỗi API chính: " . $e->getMessage());
