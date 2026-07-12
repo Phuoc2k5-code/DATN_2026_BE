@@ -33,7 +33,7 @@ class Company extends Model
     protected function casts(): array
     {
         return [
-            'is_verified' => 'boolean',
+            'is_verified' => 'integer',
         ];
     }
 

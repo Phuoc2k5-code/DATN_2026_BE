@@ -9,7 +9,9 @@ use App\Models\Company;
 use App\Models\Report;
 use App\Models\User;
 use Carbon\Carbon;
-
+use App\Mail\ReportResolvedMail;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log; 
 
 class ReportController extends Controller
 {
@@ -126,51 +128,51 @@ class ReportController extends Controller
   }
 
   public function getViolationReports(Request $request)
-{
+  {
     // Kéo kèm thông tin User gửi, Job bị báo cáo, Company bị báo cáo
     $query = Report::with([
-        'user' => function ($q) {
-            $q->withTrashed();
-        },
-        // Nạp Job kèm theo đếm tổng số report của chính Job đó
-        'job' => function ($q) {
-            $q->select('id', 'title')->withCount('reports');
-        },
-        // Nạp Company kèm theo đếm tổng số report của chính Company đó
-        'company' => function ($q) {
-            $q->select('id', 'company_name', 'logo_url')->withCount('reports');
-        }
+      'user' => function ($q) {
+        $q->withTrashed();
+      },
+      // Nạp Job kèm theo đếm tổng số report của chính Job đó
+      'job' => function ($q) {
+        $q->select('id', 'title')->withCount('reports');
+      },
+      // Nạp Company kèm theo đếm tổng số report của chính Company đó
+      'company' => function ($q) {
+        $q->select('id', 'company_name', 'logo_url')->withCount('reports');
+      }
     ])->latest();
 
     // Thêm bộ lọc trạng thái nếu phía React cần lọc (pending, resolved...)
     if ($request->has('status') && $request->status != 'all') {
-        $query->where('status', $request->status);
+      $query->where('status', $request->status);
     }
 
     // Thêm bộ lọc loại báo cáo (Lọc xem báo cáo Job hay báo cáo Company)
     if ($request->has('type') && $request->type != 'all') {
-        if ($request->type === 'job') {
-            $query->whereNotNull('job_id');
-        } elseif ($request->type === 'company') {
-            $query->whereNotNull('company_id');
-        }
+      if ($request->type === 'job') {
+        $query->whereNotNull('job_id');
+      } elseif ($request->type === 'company') {
+        $query->whereNotNull('company_id');
+      }
     }
 
     // Phân trang tự động bắt tham số ?page từ React gửi lên (Mỗi trang 10 dòng)
     $reports = $query->paginate(10);
 
     return response()->json([
-        'success'   => true,
-        'message'   => 'Lấy danh sách báo cáo thành công.',
-        'data'      => $reports->items(), // Trả về danh sách của trang hiện tại
-        'pagination' => [
-            'current_page' => $reports->currentPage(),
-            'last_page'    => $reports->lastPage(),
-            'total'        => $reports->total(),
-            'per_page'     => $reports->perPage(),
-        ]
+      'success' => true,
+      'message' => 'Lấy danh sách báo cáo thành công.',
+      'data' => $reports->items(), // Trả về danh sách của trang hiện tại
+      'pagination' => [
+        'current_page' => $reports->currentPage(),
+        'last_page' => $reports->lastPage(),
+        'total' => $reports->total(),
+        'per_page' => $reports->perPage(),
+      ]
     ], 200);
-}
+  }
 
   /**
    * API: Xem chi tiết một bản ghi báo cáo vi phạm
@@ -188,7 +190,7 @@ class ReportController extends Controller
       },
       'company' => function ($q) {
         // Lấy thêm thông tin chi tiết của Công ty
-        $q->select('id', 'company_name', 'logo_url', 'status');
+        $q->select('id', 'company_name', 'logo_url', 'is_verified');
       }
     ])->find($id);
 
@@ -207,7 +209,8 @@ class ReportController extends Controller
     ], 200);
   }
 
-  public function resolveReport(Request $request, $id){
+
+public function resolveReport(Request $request, $id) {
     $report = Report::find($id);
     if (!$report) {
       return response()->json([
@@ -215,54 +218,115 @@ class ReportController extends Controller
         'message' => 'Không tìm thấy dữ liệu báo cáo này.'
       ], 404);
     }
-    // Nếu báo cáo đã xử lý từ trước rồi thì chặn lại không cho bấm nữa
+
     if ($report->status !== 'pending') {
       return response()->json([
         'success' => false,
         'message' => 'Báo cáo này đã được xử lý hoặc bác bỏ từ trước.'
       ], 400);
     }
-    // Nhận lý do kỷ luật từ phía React gửi lên (nếu không nhập thì lấy lý do mặc định)
+
     $adminNote = $request->input('admin_note', 'Vi phạm tiêu chuẩn đăng tin tuyển dụng.');
+    $now = Carbon::now();
+
+    // Biến lưu thông tin gửi mail
+    $emailTo = null;
+    $mailData = [
+        'type' => '',
+        'targetName' => '',
+        'adminNote' => $adminNote,
+        'resolvedAt' => $now->format('H:i:s d/m/Y')
+    ];
+
+    // Ghi log bắt đầu xử lý báo cáo
+    Log::info("=== BẮT ĐẦU XỬ LÝ BÁO CÁO (ID: {$id}) ===");
+
     // NẾU LÀ BÁO CÁO TIN TUYỂN DỤNG (JOB)
     if ($report->job_id) {
       $job = Job::find($report->job_id);
       if ($job) {
-        // Chuyển sang trạng thái ẩn khóa chuyên biệt để phân biệt với bài chờ duyệt mới
         $job->update([
-          'status' => 'blocked_by_report'
+          'status' => 'blocked_by_report',
+          'reject_reason' => $adminNote
         ]);
-      }
-    }
-    // NẾU LÀ BÁO CÁO DOANH NGHIỆP (COMPANY)
-    if ($report->company_id) {
-      $company = Company::find($report->company_id);
-      if ($company) {
-        // Bước A: Chuyển trạng thái công ty sang bị đình chỉ
-        $company->update([
-          'status' => 'suspended'
-        ]);
-        // Bước B: Tìm tài khoản User (Nhà tuyển dụng) sở hữu công ty này và KHÓA LUÔN
-        // (Giả sử bảng companies của bạn có cột user_id liên kết sang bảng users)
-        $employer = User::find($company->user_id);
-        if ($employer) {
-          $employer->delete(); // Soft Delete: Khóa tài khoản, không cho đăng nhập hệ thống nữa
+
+        // Từ Job tìm Company, từ Company tìm User sở hữu
+        $company = Company::find($job->company_id);
+        if ($company) {
+            $jobOwner = User::find($company->user_id); 
+            if ($jobOwner) {
+                $emailTo = $jobOwner->email;
+                $mailData['type'] = 'job';
+                $mailData['targetName'] = $job->title ?? 'Nhà tuyển dụng'; 
+                
+                Log::info("Báo cáo JOB (ID: {$job->id}): Đã tìm thấy email chủ bài đăng: {$emailTo}");
+            } else {
+                Log::warning("Báo cáo JOB (ID: {$job->id}): Không tìm thấy tài khoản User (user_id: {$company->user_id}) của công ty.");
+            }
+        } else {
+            Log::warning("Báo cáo JOB (ID: {$job->id}): Không tìm thấy công ty tương ứng (company_id: {$job->company_id}).");
         }
       }
     }
+
+    // NẾU LÀ BÁO CÁO DOANH NGHIỆP (COMPANY)
+    if ($report->company_id) {
+      $company = Company::find($report->company_id);      
+      if ($company) {
+        $company->is_verified = 2; 
+        $company->reject_reason = $adminNote;
+        $company->save();
+        $employer = User::find($company->user_id);
+        if ($employer) {
+            $emailTo = $employer->email;
+            $mailData['type'] = 'company';
+            $mailData['targetName'] = $company->name;
+
+            Log::info("Báo cáo COMPANY (ID: {$company->id}): Đã tìm thấy email nhà tuyển dụng: {$emailTo}. Chuẩn bị Soft Delete tài khoản.");
+            $employer->status = 'locked';
+            $employer->save();
+            $employer->delete();           
+        } else {
+            Log::warning("Báo cáo COMPANY (ID: {$company->id}): Không tìm thấy tài khoản User để lấy email.");
+        }
+      }
+    }
+
     // 4. Cập nhật trạng thái bản ghi Report sang ĐÃ XỬ LÝ
     $report->update([
       'status' => 'resolved',
       'admin_note' => $adminNote,
-      'resolved_at' => Carbon::now() // Lưu mốc thời gian xử lý thực tế
+      'resolved_at' => $now
     ]);
+
+    // 5. THỰC HIỆN GỬI MAIL VÀ GHI LOG KẾT QUẢ
+    if ($emailTo) {
+        try {
+            Mail::to($emailTo)->send(new ReportResolvedMail(
+                $mailData['type'],
+                $mailData['targetName'],
+                $mailData['adminNote'],
+                $mailData['resolvedAt']
+            ));
+            
+            // Log khi gửi thành công
+            Log::info("Gửi mail kỷ luật THÀNH CÔNG đến địa chỉ: {$emailTo} (Loại: {$mailData['type']})");
+        } catch (\Exception $e) {
+            // Log lỗi chi tiết nếu mail server gặp sự cố
+            Log::error("Gửi mail kỷ luật THẤT BẠI đến địa chỉ: {$emailTo}. Lỗi: " . $e->getMessage());
+        }
+    } else {
+        Log::error("Báo cáo ID {$id} được xử lý thành công nhưng KHÔNG THỂ gửi mail thông báo do không tìm thấy email hợp lệ.");
+    }
+
+    Log::info("=== KẾT THÚC XỬ LÝ BÁO CÁO (ID: {$id}) ===");
 
     return response()->json([
       'success' => true,
-      'message' => 'Đã thực thi lệnh kỷ luật vi phạm và cập nhật trạng thái hệ thống thành công.',
+      'message' => 'Đã thực thi lệnh kỷ luật vi phạm, gửi mail thông báo và cập nhật trạng thái thành công.',
       'data' => $report
     ], 200);
-  }
+}
 
   /**
    * API 2: Bác bỏ báo cáo (Không xử phạt, giữ nguyên hiện trạng bài viết/công ty)

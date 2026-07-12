@@ -107,14 +107,8 @@ class CompanyController extends Controller
                 }
             ])
             ->leftJoin('categories', 'jobs.category_id', '=', 'categories.id')
-
-            // Cú pháp chọn lấy mọi cột của jobs và lấy tên category
             ->select('jobs.*', 'categories.name as category_name')
-
-            // 1. Format lại ngày hết hạn
             ->selectRaw('DATE_FORMAT(jobs.expired_at, "%d/%m/%Y") as deadline')
-
-            // 2. Tự động phiên dịch Trạng thái từ Database (Tiếng Anh -> Tiếng Việt)
             ->selectRaw('
                 CASE 
                     WHEN jobs.status = "active" THEN "Vận hành"
@@ -123,13 +117,8 @@ class CompanyController extends Controller
                     ELSE jobs.status 
                 END as status
             ')
-
-            // 3. Đếm tổng lượt xem
             ->selectRaw('(SELECT COALESCE(SUM(click_count), 0) FROM job_clicks WHERE job_clicks.job_id = jobs.id) as views')
-
-            // 4. Đếm tổng số lượng CV nộp vào
             ->selectRaw('(SELECT COUNT(*) FROM applications WHERE applications.job_id = jobs.id) as applicants')
-
             ->orderBy('jobs.created_at', 'desc')
             ->get();
 
@@ -314,7 +303,6 @@ class CompanyController extends Controller
             'skills' => 'required|array', // Bắt buộc gửi lên dạng mảng
             'skills.*' => 'integer|exists:skills,id', // Từng ID phải tồn tại trong bảng skills
         ]);
-
         // Cập nhật dữ liệu cơ bản
         $job->category_id = $validated['category_id'];
         $job->title = $validated['title'];
@@ -388,11 +376,9 @@ class CompanyController extends Controller
                 'applications.matching_score'
             )
             ->orderBy('applications.applied_at', 'desc');
-
         // 2. Chèn bộ lọc kỹ năng
         if ($request->has('skill') && $request->skill !== 'Tất cả') {
             $skillId = $request->skill;
-
             $query->whereExists(function ($q) use ($skillId) {
                 $q->select(\Illuminate\Support\Facades\DB::raw(1))
                     ->from('candidate_skill')
@@ -413,7 +399,7 @@ class CompanyController extends Controller
         }
 
         // 5. Format dữ liệu
-        $formattedCandidates = $candidates->map(function ($item) {           
+        $formattedCandidates = $candidates->map(function ($item) {        
 
             return [
                 'id' => $item->id,

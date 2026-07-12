@@ -23,9 +23,9 @@ class SystemModerationController extends Controller
         $jobs = Job::where('status', 'pending')
             ->when($search, function ($query, $search) {
                 return $query->where('title', 'like', "%{$search}%")
-                             ->orWhereHas('company', function ($q) use ($search) {
-                                 $q->where('company_name', 'like', "%{$search}%");
-                             });
+                    ->orWhereHas('company', function ($q) use ($search) {
+                        $q->where('company_name', 'like', "%{$search}%");
+                    });
             })
             ->with('company:id,company_name') // Lấy kèm thông tin công ty rút gọn
             ->orderBy('created_at', 'desc')
@@ -45,7 +45,7 @@ class SystemModerationController extends Controller
         $companies = Company::where('is_verified', 0) // hoặc is_verified = false tùy cấu trúc
             ->when($search, function ($query, $search) {
                 return $query->where('company_name', 'like', "%{$search}%")
-                             ->orWhere('tax_code', 'like', "%{$search}%");
+                    ->orWhere('tax_code', 'like', "%{$search}%");
             })
             ->orderBy('created_at', 'desc')
             ->get();
@@ -68,7 +68,7 @@ class SystemModerationController extends Controller
             'status' => 'active',
             'reject_reason' => null
         ]);
-            // Lấy email nhà tuyển dụng từ mối quan hệ (Job -> Company -> User)
+        // Lấy email nhà tuyển dụng từ mối quan hệ (Job -> Company -> User)
         $employerEmail = $job->company->user->email ?? null;
 
         if ($employerEmail) {
@@ -83,18 +83,18 @@ class SystemModerationController extends Controller
     public function rejectJob(Request $request, $id)
     {
         $request->validate([
-            'reason' => 'required|string|max:500'
+            'reject_reason' => 'required|string|max:500'
         ]);
 
         $job = Job::find($id);
         if (!$job) {
             return response()->json(['success' => false, 'message' => 'Không tìm thấy tin đăng này!'], 404);
         }
-        $reason = $request->input('reason');
-        
+        $reason = $request->input('reject_reason');
+
         $job->update([
             'status' => 'rejected',
-            'reject_reason' => $request->input('reason')
+            'reject_reason' => $reason
         ]);
         // Lấy email nhà tuyển dụng
         $employerEmail = $job->company->user->email ?? null;
@@ -120,29 +120,29 @@ class SystemModerationController extends Controller
             'reject_reason' => null
         ]);
         // Gửi mail thông báo duyệt thành công
-            $employerEmail = $company->user->email ?? null;
-            if ($employerEmail) {
-                Mail::to($employerEmail)->send(new CompanyApprovedMail($company));
-            }
+        $employerEmail = $company->user->email ?? null;
+        if ($employerEmail) {
+            Mail::to($employerEmail)->send(new CompanyApprovedMail($company));
+        }
         return response()->json(['success' => true, 'message' => 'Đã xác minh doanh nghiệp thành công!'], 200);
     }
 
     // 6. Từ chối doanh nghiệp
     public function rejectCompany(Request $request, $id)
     {
+        // 1. Sửa 'reason' thành 'reject_reason' trong validate
         $request->validate([
-            'reason' => 'required|string|max:500'
+            'reject_reason' => 'required|string|max:500'
         ]);
 
-        // Lấy thông tin công ty kèm user TRƯỚC KHI thực hiện xóa dữ liệu
         $company = Company::with('user')->find($id);
         if (!$company) {
             return response()->json(['success' => false, 'message' => 'Không tìm thấy doanh nghiệp!'], 404);
         }
 
-        $reason = $request->input('reason');
+        // 2. Sửa ở đây để hứng đúng data từ React
+        $reason = $request->input('reject_reason');
 
-        // Lưu email của nhà tuyển dụng ra một biến tạm trước khi xóa tài khoản của họ
         $employerEmail = $company->user->email ?? null;
 
         $company->update([
@@ -150,12 +150,10 @@ class SystemModerationController extends Controller
             'reject_reason' => $reason
         ]);
 
-        // GỬI MAIL TRƯỚC: Gửi lý do từ chối về email khi tài khoản còn tồn tại
         if ($employerEmail) {
             Mail::to($employerEmail)->send(new CompanyRejectedMail($company, $reason));
         }
 
-        // XÓA USER SAU: Sau khi gửi thư xong xuôi thì mới xóa tài khoản
         if ($company->user_id) {
             User::where('id', $company->user_id)->delete();
         }
