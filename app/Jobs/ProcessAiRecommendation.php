@@ -48,19 +48,24 @@ class ProcessAiRecommendation implements ShouldQueue
         try {
             $systemInstruction = "Bạn là một thuật toán logic toán học được tích hợp trong hệ thống ATS.\n"
                 . "Nhiệm vụ của bạn là tính toán điểm số phù hợp (matching_score) từ 0.00 đến 100.00 giữa CV của ứng viên với DANH SÁCH các công việc được cung cấp.\n\n"
+                . "QUY TẮC NGÔN NGỮ QUAN TRỌNG:\n"
+                . "- BẮT BUỘC tất cả nội dung trong thuộc tính \"reason\" phải được viết hoàn toàn bằng TIẾNG VIỆT. Tuyệt đối không sử dụng tiếng Anh.\n\n"
                 . "CÔNG THỨC VÀ QUY TẮC CHẤM ĐIỂM CHI TIẾT CHO TỪNG JOB:\n"
                 . "1. TITLE - VỊ TRÍ CÔNG VIỆC (Tối đa 30%):\n"
                 . "   - Khớp hoàn toàn tiêu đề vị trí công việc: +30 điểm.\n"
-                . "   - Khớp một phần hoặc cùng nhóm ngành (Ví dụ: CV 'Web Developer' ứng tuyển Job 'Laravel Developer'): +15 điểm.\n"
-                . "   - Khác biệt hoàn toàn về vị trí: +0 điểm.\n\n"
+                . "     *Lưu ý: Nếu tiêu đề công việc và CV chứa các từ khóa chuyên môn tương đương cốt lõi (Ví dụ: Job là 'Lập trình viên Laravel / PHP' và CV ứng viên là 'Lập trình viên PHP', 'Laravel Developer', 'PHP Developer' hoặc 'Backend Developer (PHP)'): Hãy tính là KHỚP HOÀN TOÀN để cộng 30 điểm.*\n"
+                . "   - Khớp một phần hoặc cùng nhóm ngành nghề nhưng khác level hoặc khác ngôn ngữ lập trình phụ: +15 điểm.\n"
+                . "   - Khác biệt hoàn toàn về vị trí chuyên môn: +0 điểm.\n\n"
                 . "2. CATEGORY - NGÀNH NGHỀ (Tối đa 20%):\n"
-                . "   - Trùng khớp hoàn toàn lĩnh vực ngành nghề: +20 điểm.\n"
-                . "   - Ngành nghề có liên quan hoặc bổ trợ nhau: +10 điểm.\n"
+                . "   - Trùng khớp hoàn toàn lĩnh vực ngành nghề (Ví dụ: Cùng thuộc Công nghệ thông tin): +20 điểm.\n"
+                . "   - Ngành nghề có liên quan hoặc có tính chất bổ trợ lẫn nhau: +10 điểm.\n"
                 . "   - Không liên quan: +0 điểm.\n\n"
                 . "3. SKILLS - KỸ NĂNG CHUYÊN MÔN (Tối đa 50%):\n"
-                . "   - Điểm số phần này = (Số lượng kỹ năng trong CV đáp ứng được / Tổng số kỹ năng Job yêu cầu) * 50.\n\n"
+                . "   - Điểm số phần này = (Số lượng kỹ năng trong CV đáp ứng được / Tổng số kỹ năng Job yêu cầu) * 50.\n"
+                . "   - Hãy đối chiếu linh hoạt các từ khóa kỹ năng viết tắt hoặc đồng nghĩa (Ví dụ: JS và JavaScript, Vue và VueJS, Sql và MySQL).\n\n"
                 . "TỔNG ĐIỂM (matching_score) = Điểm TITLE + Điểm CATEGORY + Điểm SKILLS.\n\n"
                 . "YÊU CẦU ĐẦU RA BẮT BUỘC:\n"
+                . "- Bạn PHẢI tính toán và chấm điểm đầy đủ cho TẤT CẢ các job_id có trong danh sách được gửi qua, KHÔNG ĐƯỢC BỎ SÓT bất kỳ job_id nào.\n"
                 . "- Tính toán số học khách quan, chính xác theo công thức trên cho từng công việc.\n"
                 . "- CHỈ trả về duy nhất một chuỗi JSON hợp lệ dạng MẢNG (Array Object), không bọc markdown ```json.\n"
                 . "- KHÔNG viết thêm bất kỳ chữ giải thích nào bên ngoài cấu trúc JSON.\n\n"
@@ -68,8 +73,8 @@ class ProcessAiRecommendation implements ShouldQueue
                 . "[\n"
                 . "  {\n"
                 . "    \"job_id\": 1,\n"
-                . "    \"matching_score\": 12.50,\n"
-                . "    \"reason\": \"Giải thích ngắn gọn lý do đạt số điểm này dựa trên Title, Category và Skills.\"\n"
+                . "    \"matching_score\": 50.00,\n"
+                . "    \"reason\": \"Giải thích ngắn gọn lý do đạt số điểm này bằng tiếng Việt (Ví dụ: Vị trí công việc khớp hoàn toàn đạt 30đ. Ngành nghề trùng khớp đạt 20đ. Tuy nhiên các kỹ năng yêu cầu không trùng khớp với CV đạt 0đ).\"\n"
                 . "  }\n"
                 . "]";
 
@@ -82,7 +87,7 @@ class ProcessAiRecommendation implements ShouldQueue
                 ->post($geminiUrl, [
                     'contents' => [['parts' => [['text' => $prompt]]]],
                     'systemInstruction' => ['parts' => [['text' => $systemInstruction]]],
-                    'generationConfig' => ['responseMimeType' => 'application/json']
+                    'generationConfig' => ['responseMimeType' => 'application/json', 'temperature' => 0.0]
                 ]);
 
             if ($response->successful()) {
@@ -111,16 +116,16 @@ class ProcessAiRecommendation implements ShouldQueue
 
                     return $job;
                 })
-                ->filter(function ($job) {
-                    return $job->matching_score >= 30; // Lọc bỏ job < 30 điểm
-                })
-                ->sortByDesc('matching_score')
-                ->values()
-                ->toArray();
+                    ->filter(function ($job) {
+                        return $job->matching_score >= 65; // Lọc bỏ job < 65 điểm
+                    })
+                    ->sortByDesc('matching_score')
+                    ->values()
+                    ->toArray();
                 // Lưu kết quả vào bộ nhớ đệm 7 ngày
                 Cache::put($this->cacheResultKey, $recommendedJobsArray, now()->addDays(7));
                 // CẬP NHẬT TRẠNG THÁI HOÀN THÀNH
-                Cache::put($this->cacheStatusKey, 'completed', now()->addHours(2));
+                Cache::put($this->cacheStatusKey, 'completed', now()->addDays(7));
 
                 Log::info("💾 [QUEUE DONE] Đã lưu kết quả thành công cho User ID: " . $this->userId);
             } else {

@@ -142,7 +142,7 @@ class UserController extends Controller
         // Cập nhật thông tin ở bảng candidates
         $candidate->update($updateCandidateData);
 
-        DB::commit(); // Xác nhận lưu thay đổi thành công vào DB
+        \DB::commit(); // Xác nhận lưu thay đổi thành công vào DB
 
         // 5. Trả về thông báo thành công và dữ liệu mới nhất
         return response()->json([
@@ -155,7 +155,7 @@ class UserController extends Controller
         ], 200);
 
     } catch (\Exception $e) {
-        DB::rollBack(); // Hoàn tác nếu có bất kỳ lỗi nào xảy ra trong quá trình update DB
+        \DB::rollBack(); // Hoàn tác nếu có bất kỳ lỗi nào xảy ra trong quá trình update DB
 
         // Nếu có upload avatar mới mà DB lỗi thì nên xóa file vừa upload để tránh file rác
         if (isset($fileName) && File::exists(public_path('avatars/' . $fileName))) {
